@@ -1,0 +1,49 @@
+{
+  "folders": [
+    {
+      "path": "."
+    }
+  ],
+  "settings": {
+    "files.associations": {
+      "*.csm": "cesium",
+      "*.csi": "cesium",
+      "VERSION": "plaintext",
+      ".local-gitignore": "gitignore",
+      ".github/workflows/exempt.txt": "gitignore",
+      ".clangd": "yaml",
+      "**/.claude/projects/*/memory/*.md": "plaintext",
+    },
+    "files.exclude": {
+      "**/node_modules/**": true,
+    },
+    "files.watcherExclude": {
+      "**/node_modules/**": true,
+      "**/dist/**": true,
+      "**/out/**": true,
+      "**/.vscode-test/**": true,
+    },
+    "files.insertFinalNewline": true,
+    "editor.wrappingIndent": "indent",
+    "[markdown]": {
+      "editor.quickSuggestions": {
+        "other": true,
+        "comments": false,
+        "strings": false
+      }
+    },
+    "terminal.integrated.automationProfile.windows": {
+      "path": "C:\\windows\\system32\\cmd.exe",
+    },
+    "ltex.additionalRules.motherTongue": "en-US",
+    "cmake.configureOnOpen": false,
+  },
+  "extensions": {
+    "recommendations": [
+      "streetsidesoftware.code-spell-checker",
+      "streetsidesoftware.code-spell-checker-scientific-terms",
+      "streetsidesoftware.code-spell-checker-win32",
+      "ltex-plus.vscode-ltex-plus",
+    ]
+  }
+}

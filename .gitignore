@@ -1,0 +1,8 @@
+/.claude/
+.local-gitignore
+node_modules/
+dist/
+out/
+bin/
+.vscode-test/
+*.vsix
