@@ -16,7 +16,8 @@ There is no extension yet. This repository exists so that the work has a place, 
 
 | Repository | What |
 | --- | --- |
-| [cesium](https://github.com/cesiumlang/cesium) | The compiler. This repository is its submodule `editors/vscode`. |
+| [cesium](https://github.com/cesiumlang/cesium) | The compiler, which contains the language server |
+| [cesium-workspace](https://github.com/cesiumlang/cesium-workspace) | The workspace that has this repository, the compiler and the others as submodules side by side |
 | [grammar](https://github.com/cesiumlang/grammar) | The TextMate grammar and its tests |
 | [zfls](https://github.com/cesiumlang/zfls) | The model for the extension's build and release pipeline (`editors/vscode` and `.github/workflows` there) |
 
