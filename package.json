@@ -2,7 +2,7 @@
   "name": "cesium",
   "displayName": "%displayName%",
   "description": "%description%",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "publisher": "cesiumlang",
   "license": "MIT",
   "icon": "icons/cesium.png",
@@ -67,15 +67,18 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run build",
-    "build": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --target=node20 --minify --sourcemap",
+    "build": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --target=node22 --minify --sourcemap",
     "typecheck": "tsc --noEmit -p . && tsc --noEmit -p test",
     "package": "vsce package --no-dependencies",
-    "unit": "esbuild test/unit/*.test.ts --bundle --outdir=out/unit --platform=node --target=node20 --format=cjs && node --test out/unit/*.test.js"
+    "unit": "esbuild test/unit/*.test.ts --bundle --outdir=out/unit --platform=node --target=node22 --format=cjs && node --test out/unit/*.test.js"
+  },
+  "overrides": {
+    "minimatch": "11.0.9"
   },
   "devDependencies": {
-    "@types/node": "20.19.0",
+    "@types/node": "22.20.5",
     "@types/vscode": "1.102.0",
-    "@vscode/vsce": "4.0.0",
+    "@vscode/vsce": "4.1.1",
     "esbuild": "0.28.2",
     "typescript": "7.0.2"
   }
