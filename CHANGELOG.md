@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.0.1 (unreleased)
+## 0.1.0 (unreleased)
 
 - The language `cesium` for `.csm` and `.csi` files, with the TextMate grammar of [cesiumlang/grammar](https://github.com/cesiumlang/grammar).
 - Comments, brackets, auto-closing pairs and indentation rules.

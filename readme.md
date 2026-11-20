@@ -29,6 +29,8 @@ npx vsce package
 - `npm run build` bundles `src/` into `dist/extension.js`; `vsce package` runs it first.
 - `npm run unit` runs the tests in `test/unit/` with plain Node.js, without VS Code.
 - `.vscodeignore` lists what goes into the VSIX, and nothing else does.
+- Dependencies are pinned to exact versions and kept free of `npm audit` findings. `@types/vscode` stays at the lowest supported VS Code (`engines.vscode`), and `@types/node` and esbuild's target at that VS Code's Node.js (22).
+- `overrides` in `package.json` forces `minimatch` 11.0.9: `@vscode/vsce` 4.1.1 asks for `^10.2.6`, which has [GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249) (fixed in 11.0.1). Drop the override once `@vscode/vsce` depends on a fixed version.
 
 ### Where the files come from
 
