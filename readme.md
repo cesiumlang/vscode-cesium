@@ -8,7 +8,17 @@ The Visual Studio Code extension for the [Cesium programming language](https://c
 - Syntax highlighting with the TextMate grammar of [cesiumlang/grammar](https://github.com/cesiumlang/grammar).
 - Comments (`//` and `/* */`), bracket matching, auto-closing quotes and brackets, and indentation after an opening bracket.
 
-The language server is `zcsls`, a stopgap server in Zig in this repository ([#7](https://github.com/cesiumlang/vscode-cesium/issues/7)), until the compiler's own `cesium lsp` takes its place ([cesiumlang/cesium#68](https://github.com/cesiumlang/cesium/issues/68)). So far it reports the errors of the bootstrap compilers (see [zcsls](#zcsls)); the extension does not start it yet ([#2](https://github.com/cesiumlang/vscode-cesium/issues/2)). Outline, go to definition and the rest come later.
+The language server is `zcsls`, a stopgap server in Zig in this repository ([#7](https://github.com/cesiumlang/vscode-cesium/issues/7)), until the compiler's own `cesium lsp` takes its place ([cesiumlang/cesium#68](https://github.com/cesiumlang/cesium/issues/68)). So far it reports the errors of the bootstrap compilers (see [zcsls](#zcsls)). Outline, go to definition and the rest come later.
+
+## The language client
+
+The extension starts the language server when a Cesium file is opened, as a thin client ([#2](https://github.com/cesiumlang/vscode-cesium/issues/2)); everything another editor could use is in the server.
+
+- **Finding the server:** the setting `cesium.server.path`, else the `zcsls` bundled in the extension's `bin/` (the platform packages), else `zcsls` on the `PATH`. When there is none, it says so and offers to open the setting. When `cesium lsp` replaces `zcsls`, only the command it starts changes.
+- **Settings:** `cesium.server.path` (the server), `cesium.compiler.path` (the compiler it checks with, passed to it at start-up) and `cesium.trace.server` (log the protocol messages). Changing either path restarts the server.
+- **Command:** **Cesium: Restart Language Server** (`cesium.restartServer`).
+- **Output:** the output channel "Cesium Language Server" has the client's log and the server's.
+- **Untrusted workspaces:** supported, but the workspace's values of `cesium.server.path` and `cesium.compiler.path`, which name programs to run, are ignored there. **Virtual workspaces:** highlighting only; the server reads files from disk, so it serves files and untitled documents only.
 
 ## zcsls
 
@@ -41,7 +51,7 @@ npm test   # in a downloaded VS Code
 
 - `npm run build` bundles `src/` into `dist/extension.js`; packaging runs it first.
 - `npm run unit` runs the tests in `test/unit/` with plain Node.js, without VS Code.
-- `npm test` runs `test/suite.ts` in a VS Code that `@vscode/test-electron` downloads, on the files of `test/fixture/`: the extension activates and `.csm` and `.csi` files are the language `cesium`. `CESIUM_EXTENSION_PATH` names an unpacked VSIX (its `extension` directory) to test instead of the checkout.
+- `npm test` runs `test/suite.ts` in a VS Code that `@vscode/test-electron` downloads, on the files of `test/fixture/`: the extension activates and `.csm` and `.csi` files are the language `cesium`. `CESIUM_EXTENSION_PATH` names an unpacked VSIX (its `extension` directory) to test instead of the checkout. With `CESIUM_DIAGNOSTICS` set, it also opens `test/fixture/error/unknown_name.csm` and waits for the language server's diagnostic, which needs `zcsls` (a platform VSIX, or `cesium.server.path`) and `cesium1` on the `PATH`. CI builds `cesium1` from cesiumlang/cesium `dev` for that, and skips this part with a warning if it cannot.
 - `zig build` builds `zcsls` into `zig-out/bin`.
 - `zig build package-vscode -- DIST` writes `DIST/vscode-cesium-v<version>-<platform>.vsix` (`build/package_vscode.zig`), as in zfls: one per VS Code platform (`win32-x64`, `win32-arm64`, `linux-x64`, `linux-arm64`, `alpine-x64`, `alpine-arm64`, `darwin-x64`, `darwin-arm64`), each with `zcsls` cross-compiled for it in `bin/`, and `universal` without a server. `-Dplatforms=false` packages the universal VSIX only.
 - `zig build test` runs the unit tests of `zcsls` (`server/`, `server/_test/`) and of the build tools in `build/`.
@@ -54,7 +64,7 @@ npm test   # in a downloaded VS Code
 
 - `build.zig.zon` holds the version of the next release; packaging writes it into `package.json` for the VSIX only, so the version in `package.json` is a placeholder (`0.0.0`).
 - While the server is `zcsls`, every version is a pre-release, `0.<odd>.<patch>` ([#3](https://github.com/cesiumlang/vscode-cesium/issues/3)): the Marketplace takes no semver suffixes such as `-pre` and recommends odd minor versions for pre-releases. Packaging fails on a version with an even minor, and marks the VSIX as a pre-release. The first full release comes with `cesium lsp`.
-- GitHub Actions (`.github/workflows/ci.yml`) builds, tests and packages every pull request and every push to `main` and `dev`: the type check, the unit tests, the generated files, the VSIX, and the VSIX run in a downloaded VS Code on Linux, macOS and Windows. Its job "CI" sums up a run, for the rulesets to require.
+- GitHub Actions (`.github/workflows/ci.yml`) builds, tests and packages every pull request and every push to `main` and `dev`: the type check, the unit tests, the generated files, the VSIX files, and each runner's platform VSIX run in a downloaded VS Code on Linux, macOS and Windows. Its job "CI" sums up a run, for the rulesets to require.
 - A push to `main` whose version is not tagged yet is released once it passes: the commit is tagged, a GitHub pre-release is made with the VSIX, the publishing workflows are started, and `main` is merged back into `dev`, where `build.zig.zon` gets the next patch version. For a new minor version, set it on `dev` by hand. A pull request into `main` fails when its version is already released.
 
 ### Publishing

@@ -1,1 +1,7 @@
-{}
+{
+  "Cesium Language Server": "Cesium Language Server",
+  "Cesium: no language server found. Set cesium.server.path, or put {0} on the PATH.": "Cesium: no language server found. Set cesium.server.path, or put {0} on the PATH.",
+  "Cesium: the language server failed to start: {0}": "Cesium: the language server failed to start: {0}",
+  "Cesium: there is no language server at {0}, which cesium.server.path names.": "Cesium: there is no language server at {0}, which cesium.server.path names.",
+  "Open Settings": "Open Settings"
+}

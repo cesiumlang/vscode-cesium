@@ -9,8 +9,11 @@ name: CI
 #   built for it in bin/, and the universal one without a server, kept as
 #   the artifact `dist`. Zig is the devkit's (devkit-version), as in
 #   cesiumlang/cesium.
-# - Test: the packaged extension, unpacked as VS Code installs it, in a
-#   downloaded VS Code on Linux (under xvfb), macOS and Windows.
+# - Test: the platform VSIX of each runner, unpacked as VS Code installs
+#   it, in a downloaded VS Code on Linux (under xvfb), macOS and Windows:
+#   the extension activates, and its zcsls reports the error of a fixture,
+#   with a cesium1 built from cesiumlang/cesium dev. If cesium1 cannot be
+#   built, that part is skipped with a warning.
 # - CI: the one check the rulesets require.
 #
 # Versions: build.zig.zon holds the version of the next release. A push to
@@ -169,7 +172,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-15, windows-2025]
+        include:
+          - { os: ubuntu-24.04, platform: linux-x64 }
+          - { os: macos-15, platform: darwin-arm64 }
+          - { os: windows-2025, platform: win32-x64 }
     env:
       CESIUM_VERSION: ${{ needs.version.outputs.version }}
     steps:
@@ -186,17 +192,54 @@ jobs:
           name: dist
           path: dist
 
+      # cesium1 for the diagnostics test, built from cesiumlang/cesium dev
+      # with its devkit, as its own CI builds it. cesium1 is built only by
+      # `zig build test` there (not installed), so the corpus runs too, and
+      # cesium1 is taken from the build cache.
+      - uses: actions/checkout@v7
+        with:
+          repository: cesiumlang/cesium
+          ref: dev
+          path: cesium-compiler
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: cesium1 from cesiumlang/cesium dev
+        id: cesium1
+        continue-on-error: true
+        working-directory: cesium-compiler
+        run: |
+          python tools/fetch-devkit.py
+          .devkit/zig/zig build test --summary failures
+          exe=cesium1
+          if [ "$RUNNER_OS" = Windows ]; then exe=cesium1.exe; fi
+          found=$(find .zig-cache/o -type f -name "$exe" | head -1)
+          if [ -z "$found" ]; then
+            echo "::error::no $exe in the build cache"
+            exit 1
+          fi
+          mkdir -p "$RUNNER_TEMP/compilers"
+          cp "$found" "$RUNNER_TEMP/compilers/"
+          echo "$RUNNER_TEMP/compilers" >> "$GITHUB_PATH"
+
+      - name: Without cesium1, the diagnostics test is skipped
+        if: steps.cesium1.outcome != 'success'
+        run: echo "::warning::cesium1 could not be built from cesiumlang/cesium dev; the diagnostics test is skipped"
+
       - name: VS Code's libraries and a display (Linux)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y xvfb libnss3 libgbm1 libasound2t64 libgtk-3-0t64 libxss1 libsecret-1-0
 
-      # The universal VSIX, unpacked as VS Code would install it, in a
-      # downloaded VS Code (test/runTest.ts, test/suite.ts)
+      # The runner's platform VSIX, with zcsls, unpacked as VS Code would
+      # install it, in a downloaded VS Code (test/runTest.ts, test/suite.ts)
       - name: The packaged extension in VS Code
         env:
-          VSIX: dist/vscode-cesium-v${{ needs.version.outputs.version }}-universal.vsix
+          VSIX: dist/vscode-cesium-v${{ needs.version.outputs.version }}-${{ matrix.platform }}.vsix
+          CESIUM_DIAGNOSTICS: ${{ steps.cesium1.outcome == 'success' && '1' || '' }}
         run: |
           py=python3
           if [ "$RUNNER_OS" = Windows ]; then py=python; fi

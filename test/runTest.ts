@@ -2,6 +2,8 @@
 // on the fixture workspace test/fixture (`npm test`; CI runs it on Linux,
 // macOS and Windows). CESIUM_EXTENSION_PATH, when set, is an unpacked VSIX
 // (its `extension` directory), to test the packaged extension.
+// CESIUM_DIAGNOSTICS, when set, also tests the language server's
+// diagnostics, which needs zcsls and cesium1 (test/suite.ts).
 
 import * as fs from "node:fs";
 import * as os from "node:os";
@@ -28,7 +30,10 @@ async function main(): Promise<void> {
       "--disable-gpu",
       `--user-data-dir=${fs.mkdtempSync(path.join(os.tmpdir(), "cesium-vscode-"))}`,
     ],
-    extensionTestsEnv: { CESIUM_VERSION: process.env.CESIUM_VERSION ?? "" },
+    extensionTestsEnv: {
+      CESIUM_VERSION: process.env.CESIUM_VERSION ?? "",
+      CESIUM_DIAGNOSTICS: process.env.CESIUM_DIAGNOSTICS ?? "",
+    },
   });
 }
 
