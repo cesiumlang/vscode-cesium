@@ -8,7 +8,18 @@ The Visual Studio Code extension for the [Cesium programming language](https://c
 - Syntax highlighting with the TextMate grammar of [cesiumlang/grammar](https://github.com/cesiumlang/grammar).
 - Comments (`//` and `/* */`), bracket matching, auto-closing quotes and brackets, and indentation after an opening bracket.
 
-There is no language server yet: no diagnostics, outline or go to definition. They come with `zcsls`, a stopgap server in Zig in this repository ([#7](https://github.com/cesiumlang/vscode-cesium/issues/7)), until the compiler's own `cesium lsp` takes its place ([cesiumlang/cesium#68](https://github.com/cesiumlang/cesium/issues/68)).
+The language server is `zcsls`, a stopgap server in Zig in this repository ([#7](https://github.com/cesiumlang/vscode-cesium/issues/7)), until the compiler's own `cesium lsp` takes its place ([cesiumlang/cesium#68](https://github.com/cesiumlang/cesium/issues/68)). So far it reports the errors of the bootstrap compilers (see [zcsls](#zcsls)); the extension does not start it yet ([#2](https://github.com/cesiumlang/vscode-cesium/issues/2)). Outline, go to definition and the rest come later.
+
+## zcsls
+
+`zcsls` (`server/`) speaks the Language Server Protocol over standard input and output, so any editor can use it. The requests it answers are those `cesium lsp` must answer later: `initialize`, `initialized`, `shutdown`, `exit`, full text sync (`textDocument/didOpen`, `didChange`, `didSave`, `didClose`), and it sends `textDocument/publishDiagnostics`. The name is temporary: settings and commands are `cesium.*`.
+
+- **The compiler.** It checks with `cesium1` when there is one, since it follows S1 as it grows, else with `cesium0`, which knows only S0 (see `bootstrap/README.md` in [cesiumlang/cesium](https://github.com/cesiumlang/cesium)). The setting `cesium.compiler.path`, passed as `initializationOptions` (`{"compiler": {"path": "..."}}`), names a compiler or a directory that holds one; without it, `cesium1` and then `cesium0` are looked for on the `PATH`. A compiler whose name starts with `cesium0` is run as `cesium0`, any other as `cesium1`. No compiler is bundled: in cesium-workspace they are built in `../cesium-src` (`zig build test` builds `cesium1`).
+- **The unit.** What files make a compilation unit is not decided yet ([#7](https://github.com/cesiumlang/vscode-cesium/issues/7)). Until it is, the unit of a file is every `.csm` file in its directory, in byte order of their names (`server/unit.zig`, the one place to change).
+- **When it checks.** When a document is opened and when it is saved, not while typing. `cesium1` reads the unit on standard input, so it is given the text of the open documents, unsaved edits included; `cesium0` reads files, so it sees what is saved. A document that is not a local file (an untitled one) is a unit of its own, checked by `cesium1` only.
+- **Where errors go.** `cesium1` counts lines from the start of its input, the unit's files one after another (each ending in a line break); `zcsls` maps each line back to its file and line. `cesium0` names the file. Columns are converted to UTF-16, as LSP counts them. A message without a place (the verifier's, a limit of `cesium1`) goes on the first line of the document checked. Each file of the unit gets its diagnostics, and a later check clears those that are gone.
+- **Limits.** `cesium1` stops at the first error, so a unit shows one error at a time; `cesium0` reports every error it finds, but knows only S0. An error at the end of one file can be reported at the start of the next one, as the compiler sees them joined.
+- `zcsls --version` prints its version, which is the extension's (`build.zig.zon`).
 
 ## Status
 
@@ -31,8 +42,9 @@ npm test   # in a downloaded VS Code
 - `npm run build` bundles `src/` into `dist/extension.js`; packaging runs it first.
 - `npm run unit` runs the tests in `test/unit/` with plain Node.js, without VS Code.
 - `npm test` runs `test/suite.ts` in a VS Code that `@vscode/test-electron` downloads, on the files of `test/fixture/`: the extension activates and `.csm` and `.csi` files are the language `cesium`. `CESIUM_EXTENSION_PATH` names an unpacked VSIX (its `extension` directory) to test instead of the checkout.
-- `zig build package-vscode -- DIST` writes `DIST/vscode-cesium-v<version>-universal.vsix` (`build/package_vscode.zig`). Until `zcsls` exists ([#7](https://github.com/cesiumlang/vscode-cesium/issues/7)) there is no server to bundle, so the universal VSIX is the only one; with `zcsls`, one VSIX per VS Code platform with its `zcsls` in `bin/` is added, as in zfls.
-- `zig build test` runs the unit tests of the build tools in `build/`.
+- `zig build` builds `zcsls` into `zig-out/bin`.
+- `zig build package-vscode -- DIST` writes `DIST/vscode-cesium-v<version>-<platform>.vsix` (`build/package_vscode.zig`), as in zfls: one per VS Code platform (`win32-x64`, `win32-arm64`, `linux-x64`, `linux-arm64`, `alpine-x64`, `alpine-arm64`, `darwin-x64`, `darwin-arm64`), each with `zcsls` cross-compiled for it in `bin/`, and `universal` without a server. `-Dplatforms=false` packages the universal VSIX only.
+- `zig build test` runs the unit tests of `zcsls` (`server/`, `server/_test/`) and of the build tools in `build/`.
 - `.vscodeignore` lists what goes into the VSIX, and nothing else does.
 - **Supported VS Code:** `engines.vscode` is the stable VS Code that was current when it was last raised (1.147.0, 2026-11-20). No compatibility with older versions is kept: raise it whenever a newer API or Node.js helps. `@types/vscode` is the newest published version not above it (1.146.0; the types trail a release), and `@types/node` and esbuild's target follow that VS Code's Node.js (24).
 - Dependencies are pinned to exact versions and kept free of `npm audit` findings.

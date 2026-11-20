@@ -3,16 +3,15 @@ name: CI
 # Builds, tests and packages the extension, modeled on zfls's ci.yml (#3).
 # Pull requests and pushes to main and dev are run.
 #
-# - Build: type check, the unit tests of the extension (plain Node.js) and of
-#   the Zig build tools, the generated files, and the VSIX (`zig build
-#   package-vscode`), kept as the artifact `dist`. Zig is the devkit's
-#   (devkit-version), as in cesiumlang/cesium.
+# - Build: type check, the unit tests of the extension (plain Node.js), of
+#   zcsls and of the Zig build tools, the generated files, and the VSIX
+#   files (`zig build package-vscode`): one per VS Code platform with zcsls
+#   built for it in bin/, and the universal one without a server, kept as
+#   the artifact `dist`. Zig is the devkit's (devkit-version), as in
+#   cesiumlang/cesium.
 # - Test: the packaged extension, unpacked as VS Code installs it, in a
 #   downloaded VS Code on Linux (under xvfb), macOS and Windows.
 # - CI: the one check the rulesets require.
-#
-# Only the universal VSIX is packaged until zcsls exists (#7); its platform
-# packages (with zcsls in bin/) are then built, tested and released here too.
 #
 # Versions: build.zig.zon holds the version of the next release. A push to
 # main whose version is not tagged yet, once built and tested, is tagged and
@@ -144,9 +143,9 @@ jobs:
           "$RUNNER_TEMP/devkit/zig/zig" version
 
       - name: Zig source is formatted (zig fmt)
-        run: zig fmt --check build build.zig build.zig.zon
+        run: zig fmt --check build build.zig build.zig.zon server
 
-      - name: Unit tests of the build tools
+      - name: Unit tests of zcsls and the build tools
         run: zig build test --summary failures
 
       # package.nls.json and l10n/bundle.l10n.json (build/generated.zig)
@@ -263,14 +262,15 @@ jobs:
           name: dist
           path: dist
 
-      # the platform packages are checked here too once there are any (#7)
       - name: Check the packages
         run: |
           ls -l dist
-          if [ ! -f "dist/vscode-cesium-v$VERSION-universal.vsix" ]; then
-            echo "::error::no universal VSIX at version $VERSION"
-            exit 1
-          fi
+          for p in universal win32-x64 win32-arm64 linux-x64 linux-arm64 alpine-x64 alpine-arm64 darwin-x64 darwin-arm64; do
+            if [ ! -f "dist/vscode-cesium-v$VERSION-$p.vsix" ]; then
+              echo "::error::no $p VSIX at version $VERSION"
+              exit 1
+            fi
+          done
 
       - name: Tag the tested commit
         run: |
