@@ -1,0 +1,13 @@
+# Only what the extension needs at run time goes into the VSIX
+**
+!package.json
+!package.nls.json
+!language-configuration.json
+!dist/extension.js
+!grammar/cesium.tmGrammar.json
+!grammar/LICENSE
+!icons/**
+!l10n/**
+!readme.md
+!CHANGELOG.md
+!LICENSE

@@ -1,0 +1,82 @@
+{
+  "name": "cesium",
+  "displayName": "%displayName%",
+  "description": "%description%",
+  "version": "0.0.1",
+  "publisher": "cesiumlang",
+  "license": "MIT",
+  "icon": "icons/cesium.png",
+  "galleryBanner": {
+    "color": "#161618",
+    "theme": "dark"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cesiumlang/vscode-cesium"
+  },
+  "bugs": {
+    "url": "https://github.com/cesiumlang/vscode-cesium/issues"
+  },
+  "homepage": "https://cesiumlang.org",
+  "categories": [
+    "Programming Languages"
+  ],
+  "keywords": [
+    "cesium",
+    "csm",
+    "csi"
+  ],
+  "engines": {
+    "vscode": "^1.102.0"
+  },
+  "main": "./dist/extension.js",
+  "l10n": "./l10n",
+  "activationEvents": [],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": true
+    },
+    "virtualWorkspaces": true
+  },
+  "contributes": {
+    "languages": [
+      {
+        "id": "cesium",
+        "aliases": [
+          "Cesium",
+          "cesium"
+        ],
+        "extensions": [
+          ".csm",
+          ".csi"
+        ],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./icons/cesium.svg",
+          "dark": "./icons/cesium.svg"
+        }
+      }
+    ],
+    "grammars": [
+      {
+        "language": "cesium",
+        "scopeName": "source.cesium",
+        "path": "./grammar/cesium.tmGrammar.json"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "build": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --target=node20 --minify --sourcemap",
+    "typecheck": "tsc --noEmit -p . && tsc --noEmit -p test",
+    "package": "vsce package --no-dependencies",
+    "unit": "esbuild test/unit/*.test.ts --bundle --outdir=out/unit --platform=node --target=node20 --format=cjs && node --test out/unit/*.test.js"
+  },
+  "devDependencies": {
+    "@types/node": "20.19.0",
+    "@types/vscode": "1.102.0",
+    "@vscode/vsce": "4.0.0",
+    "esbuild": "0.28.2",
+    "typescript": "7.0.2"
+  }
+}

@@ -11,6 +11,8 @@
     "package-lock.json",
     "*.vsix",
     "dist/**",
+    "out/**",
+    "grammar/**",
   ],
   "dictionaryDefinitions": [
     {
