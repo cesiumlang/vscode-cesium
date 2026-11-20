@@ -1,0 +1,5 @@
+// A fixture of the VS Code test (test/suite.ts): an error the language
+// server reports
+i32 = main() {
+  return x;
+}

@@ -34,9 +34,17 @@
   "activationEvents": [],
   "capabilities": {
     "untrustedWorkspaces": {
-      "supported": true
+      "supported": "limited",
+      "description": "In an untrusted workspace, the workspace settings that name programs to run (cesium.server.path, cesium.compiler.path) are ignored.",
+      "restrictedConfigurations": [
+        "cesium.server.path",
+        "cesium.compiler.path"
+      ]
     },
-    "virtualWorkspaces": true
+    "virtualWorkspaces": {
+      "supported": "limited",
+      "description": "The language server reads the files of a unit from disk, so there are no diagnostics in virtual workspaces."
+    }
   },
   "contributes": {
     "languages": [
@@ -63,7 +71,42 @@
         "scopeName": "source.cesium",
         "path": "./grammar/cesium.tmGrammar.json"
       }
-    ]
+    ],
+    "commands": [
+      {
+        "command": "cesium.restartServer",
+        "title": "%command.cesium.restartServer.title%",
+        "category": "%command.category%"
+      }
+    ],
+    "configuration": {
+      "title": "%configuration.title%",
+      "properties": {
+        "cesium.server.path": {
+          "type": "string",
+          "default": "",
+          "scope": "machine-overridable",
+          "markdownDescription": "%config.cesium.server.path.markdownDescription%"
+        },
+        "cesium.compiler.path": {
+          "type": "string",
+          "default": "",
+          "scope": "machine-overridable",
+          "markdownDescription": "%config.cesium.compiler.path.markdownDescription%"
+        },
+        "cesium.trace.server": {
+          "type": "string",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "default": "off",
+          "scope": "window",
+          "description": "%config.cesium.trace.server.description%"
+        }
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run build",
@@ -75,6 +118,9 @@
   },
   "overrides": {
     "minimatch": "11.0.9"
+  },
+  "dependencies": {
+    "vscode-languageclient": "11.0.0"
   },
   "devDependencies": {
     "@types/node": "24.19.2",
