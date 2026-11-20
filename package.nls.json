@@ -1,0 +1,4 @@
+{
+  "displayName": "Cesium Language",
+  "description": "Support for the Cesium programming language: syntax highlighting, comments, brackets and indentation for .csm and .csi files"
+}
