@@ -58,8 +58,8 @@ jobs:
           node-version-file: .node-version
 
       # the universal package, without a server, which the Marketplace serves
-      # to the platforms with no package of their own; and, once there is
-      # zcsls (#7), the platform packages, each with its zcsls
+      # to the platforms with no package of their own, and the platform
+      # packages, each with its zcsls
       - name: Download the release's extension packages
         env:
           GH_TOKEN: ${{ github.token }}

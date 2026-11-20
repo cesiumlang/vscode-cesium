@@ -57,8 +57,8 @@ jobs:
           node-version-file: .node-version
 
       # The platform packages, each with its zcsls, as zfls publishes; the
-      # universal package goes to the Marketplace only. Until zcsls exists
-      # (#7) the universal package is the only one, and is published here too.
+      # universal package goes to the Marketplace only (a release without
+      # platform packages has it published here too).
       - name: Download the release's extension packages
         env:
           GH_TOKEN: ${{ github.token }}

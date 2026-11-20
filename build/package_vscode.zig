@@ -1,15 +1,11 @@
-//! `package_vscode VERSION DIST` (`zig build package-vscode -- DIST`), run at
-//! the root of the repository: packages the extension as
-//! DIST/vscode-cesium-vVERSION-PLATFORM.vsix. npm builds it and `npx vsce
+//! `package_vscode VERSION PLATFORM=ZCSLS... DIST` (`zig build
+//! package-vscode -- DIST`), run at the root of the repository: packages the
+//! extension as DIST/vscode-cesium-vVERSION-PLATFORM.vsix, once per VS Code
+//! platform named, with that ZCSLS in bin/, and once as the universal VSIX
+//! without one (it runs `cesium.server.path` or zcsls from the PATH), as
+//! zfls's build/package_vscode.zig does. npm builds it and `npx vsce
 //! package` packages it, with VERSION set in package.json for the packaging
 //! only.
-//!
-//! Until zcsls exists (#7) there is no server binary, so only the universal
-//! VSIX (no server; it is to run one from the PATH) is written. With zcsls,
-//! one VSIX per VS Code platform (win32-x64, win32-arm64, linux-x64,
-//! linux-arm64, alpine-x64, alpine-arm64, darwin-x64, darwin-arm64) is
-//! packaged here too, each with its zcsls in bin/ (`packageVsix` with the
-//! platform), as zfls's build/package_vscode.zig does.
 
 const std = @import("std");
 const Io = std.Io;
@@ -22,7 +18,7 @@ pub fn main(init: std.process.Init) !u8 {
     const io = init.io;
     const a = init.arena.allocator();
     const argv = try init.minimal.args.toSlice(a);
-    if (argv.len != 3) {
+    if (argv.len < 3) {
         std.debug.print("usage: zig build package-vscode -- DIST\n", .{});
         return 2;
     }
@@ -32,8 +28,9 @@ pub fn main(init: std.process.Init) !u8 {
         return 1;
     };
     const cwd = Io.Dir.cwd();
-    try cwd.createDirPath(io, argv[2]);
-    const dist = try cwd.realPathFileAlloc(io, argv[2], a);
+    const dist_arg = argv[argv.len - 1];
+    try cwd.createDirPath(io, dist_arg);
+    const dist = try cwd.realPathFileAlloc(io, dist_arg, a);
 
     try run(io, &.{ "npm", "ci", "--no-audit", "--no-fund" });
     // the version is set for packaging only
@@ -42,11 +39,35 @@ pub fn main(init: std.process.Init) !u8 {
         std.debug.print("restoring package.json: {s}\n", .{@errorName(e)});
     try run(io, &.{ "npm", "pkg", "set", try a.print("version={s}", .{version}) });
 
-    // the platform packages come here, with zcsls (#7)
-    const vsix = try packageVsix(io, a, dist, version, null);
-    const st = try cwd.statFile(io, vsix, .{});
-    std.debug.print("{d:>10} {s}\n", .{ st.size, vsix });
+    defer cwd.deleteTree(io, "bin") catch {};
+    var written: std.ArrayList([]const u8) = .empty;
+    for (argv[2 .. argv.len - 1]) |arg| {
+        const p = splitPlatform(arg) orelse {
+            std.debug.print("not PLATFORM=ZCSLS: {s}\n", .{arg});
+            return 2;
+        };
+        try cwd.deleteTree(io, "bin");
+        try cwd.createDirPath(io, "bin");
+        const exe = if (std.mem.startsWith(u8, p.platform, "win32-")) "bin/zcsls.exe" else "bin/zcsls";
+        try Io.Dir.copyFile(cwd, p.zcsls, cwd, exe, io, .{ .permissions = .executable_file });
+        try written.append(a, try packageVsix(io, a, dist, version, p.platform));
+    }
+    try cwd.deleteTree(io, "bin");
+    try written.append(a, try packageVsix(io, a, dist, version, null));
+    for (written.items) |vsix| {
+        const st = try cwd.statFile(io, vsix, .{});
+        std.debug.print("{d:>10} {s}\n", .{ st.size, vsix });
+    }
     return 0;
+}
+
+const PlatformArg = struct { platform: []const u8, zcsls: []const u8 };
+
+/// `PLATFORM=ZCSLS`: a VS Code platform and its zcsls
+fn splitPlatform(arg: []const u8) ?PlatformArg {
+    const eq = std.mem.findScalar(u8, arg, '=') orelse return null;
+    if (eq == 0 or eq + 1 == arg.len) return null;
+    return .{ .platform = arg[0..eq], .zcsls = arg[eq + 1 ..] };
 }
 
 const VersionError = error{ NotMajorMinorPatch, EvenMinorForPreRelease, OddMinorForRelease };
@@ -104,6 +125,15 @@ test checkVersion {
     try testing.expectError(error.NotMajorMinorPatch, checkVersion("0.1.0-pre", true));
     try testing.expectError(error.NotMajorMinorPatch, checkVersion("0.1", true));
     try testing.expectError(error.NotMajorMinorPatch, checkVersion("0.1.0.1", true));
+}
+
+test splitPlatform {
+    const p = splitPlatform("win32-x64=C:\\cache\\zcsls.exe").?;
+    try testing.expectEqualStrings("win32-x64", p.platform);
+    try testing.expectEqualStrings("C:\\cache\\zcsls.exe", p.zcsls);
+    try testing.expect(splitPlatform("dist") == null);
+    try testing.expect(splitPlatform("=x") == null);
+    try testing.expect(splitPlatform("linux-x64=") == null);
 }
 
 test vsixPath {

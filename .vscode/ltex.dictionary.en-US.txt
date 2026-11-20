@@ -2,6 +2,7 @@ cesiumlang
 direnv
 envrc
 esbuild
+musl
 OVSX
 vscodeignore
 vsix
