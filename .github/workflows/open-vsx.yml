@@ -1,0 +1,94 @@
+# Publishes a release's VS Code extension packages to Open VSX, as zfls's
+# open-vsx.yml does.
+#
+# Open VSX trusts this workflow by its file name (trusted publishing for the
+# `cesiumlang` namespace): it accepts the OIDC token of a run of
+# `open-vsx.yml` in this repository, so no stored token is needed. The
+# OVSX_PAT secret is used only if that is refused. The CI workflow starts it
+# after publishing a release; it can also be run by hand (Actions > Publish
+# to Open VSX > Run workflow) to publish, or finish publishing, any released
+# version.
+#
+# While the server is zcsls, every version is a pre-release (#3, #4). The
+# packages are marked so (`vsce package --pre-release`), which is what Open
+# VSX reads: ovsx ignores `--pre-release` for a prepackaged VSIX, with a
+# warning, so it is not passed.
+name: Publish to Open VSX
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Released version to publish, without the v (e.g. 0.1.0)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: open-vsx-${{ inputs.version }}
+  cancel-in-progress: false
+
+env:
+  OVSX_VERSION: 1.4.0
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  publish:
+    name: Publish cesiumlang.cesium v${{ inputs.version }} to Open VSX
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      VERSION: ${{ inputs.version }}
+    steps:
+      # only for .node-version
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: .node-version
+          sparse-checkout-cone-mode: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+
+      # The platform packages, each with its zcsls, as zfls publishes; the
+      # universal package goes to the Marketplace only. Until zcsls exists
+      # (#7) the universal package is the only one, and is published here too.
+      - name: Download the release's extension packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "v$VERSION" --repo "$GITHUB_REPOSITORY" \
+            --dir dist --pattern "vscode-cesium-v$VERSION-*.vsix"
+          universal="dist/vscode-cesium-v$VERSION-universal.vsix"
+          if ls dist/*.vsix | grep -qvxF "$universal"; then
+            rm -f "$universal"
+          fi
+          ls dist
+
+      # --skip-duplicate: a version already published counts as published,
+      # so a re-run completes what a failed one left out
+      - name: Publish
+        env:
+          # a fallback only, for if trusted publishing is refused
+          OPENVSX_TOKEN: ${{ secrets.OVSX_PAT }}
+        run: |
+          ovsx() { npx --yes "ovsx@$OVSX_VERSION" "$@"; }
+          failed=0
+          for vsix in dist/*.vsix; do
+            if ovsx publish "$vsix" --trusted-publishing --skip-duplicate; then
+              continue
+            fi
+            if [ -n "$OPENVSX_TOKEN" ]; then
+              echo "::warning::trusted publishing of $vsix failed; publishing with the OVSX_PAT secret"
+              OVSX_PAT="$OPENVSX_TOKEN" ovsx publish "$vsix" --skip-duplicate && continue
+            fi
+            echo "::error::publishing $vsix failed"
+            failed=1
+          done
+          exit "$failed"
