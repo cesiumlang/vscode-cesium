@@ -1,5 +1,10 @@
 cesiumlang
+direnv
+envrc
+esbuild
 OVSX
+vscodeignore
 vsix
 VSIX
+zcsls
 zfls
