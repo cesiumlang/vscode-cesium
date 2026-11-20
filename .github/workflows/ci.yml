@@ -1,0 +1,363 @@
+name: CI
+
+# Builds, tests and packages the extension, modeled on zfls's ci.yml (#3).
+# Pull requests and pushes to main and dev are run.
+#
+# - Build: type check, the unit tests of the extension (plain Node.js) and of
+#   the Zig build tools, the generated files, and the VSIX (`zig build
+#   package-vscode`), kept as the artifact `dist`. Zig is the devkit's
+#   (devkit-version), as in cesiumlang/cesium.
+# - Test: the packaged extension, unpacked as VS Code installs it, in a
+#   downloaded VS Code on Linux (under xvfb), macOS and Windows.
+# - CI: the one check the rulesets require.
+#
+# Only the universal VSIX is packaged until zcsls exists (#7); its platform
+# packages (with zcsls in bin/) are then built, tested and released here too.
+#
+# Versions: build.zig.zon holds the version of the next release. A push to
+# main whose version is not tagged yet, once built and tested, is tagged and
+# published as a GitHub pre-release with the VSIX; the publishing workflows
+# (open-vsx.yml, marketplace.yml) are then started, and main is merged back
+# into dev, where build.zig.zon gets the next patch version. While the
+# server is zcsls every version is a pre-release, 0.<odd>.<patch> (#3); for
+# a new minor version, set it in build.zig.zon on dev by hand. A push to main
+# whose version is already tagged is tested but not released.
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  version:
+    name: Version
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+      release: ${{ steps.ver.outputs.release }}
+      sha: ${{ steps.ver.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # A pull request into main must carry an unreleased version, newer
+      # than the latest tag
+      - name: Work out the version
+        id: ver
+        env:
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          version=$(sed -nE 's/^\s*\.version = "([^"]+)",/\1/p' build.zig.zon)
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error file=build.zig.zon::cannot read a MAJOR.MINOR.PATCH .version (got '$version')"
+            exit 1
+          fi
+          tagged() { git rev-parse -q --verify "refs/tags/v$1" >/dev/null; }
+          latest=$(git tag --list 'v[0-9]*' --sort=-version:refname | head -1)
+          latest=${latest#v}
+          if [ "$EVENT" = pull_request ] && [ "$BASE_REF" = main ] && [ -n "$latest" ]; then
+            newest=$(printf '%s\n%s\n' "$version" "$latest" | sort -V | tail -1)
+            if [ "$version" = "$latest" ] || [ "$newest" != "$version" ]; then
+              echo "::error file=build.zig.zon::.version is $version, but v$latest is already released. Set a newer version."
+              exit 1
+            fi
+          fi
+
+          release=false
+          if [ "$EVENT" = push ] && [ "$REF" = refs/heads/main ]; then
+            git fetch -q origin main
+            if [ "$(git rev-parse origin/main)" != "$(git rev-parse HEAD)" ]; then
+              # main moved on: the run for the newer commit releases it
+              echo "main has moved past this commit; testing only" | tee -a "$GITHUB_STEP_SUMMARY"
+            elif tagged "$version"; then
+              echo "::warning::main holds v$version, which is already released; testing only. Set a newer version on dev and merge it."
+            else
+              release=true
+            fi
+          fi
+          sha=$(git rev-parse HEAD)
+          {
+            echo "version=$version"
+            echo "release=$release"
+            echo "sha=$sha"
+          } >> "$GITHUB_OUTPUT"
+          echo "version $version at $sha; release: $release" | tee -a "$GITHUB_STEP_SUMMARY"
+
+  build:
+    name: Build and package
+    needs: version
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      # the grammar is a submodule
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.version.outputs.sha }}
+          submodules: recursive
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+
+      - name: Install the dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Type check
+        run: npm run typecheck
+
+      # the tests that need no VS Code, in plain Node.js
+      - name: Unit tests
+        run: npm run unit
+
+      # Only the devkit's Zig is unpacked; the archive is checked against the
+      # sha256 the release's devkits.json gives for it
+      - name: Fetch the devkit's Zig
+        run: |
+          version=$(tr -d '[:space:]' < devkit-version)
+          base="https://github.com/cesiumlang/devkits/releases/download/v$version"
+          host=x86_64-linux-musl
+          curl -fsSL --retry 5 -o "$RUNNER_TEMP/devkits.json" "$base/devkits.json"
+          url=$(jq -er --arg h "$host" '.devkits[$h].url' "$RUNNER_TEMP/devkits.json")
+          sha=$(jq -er --arg h "$host" '.devkits[$h].sha256' "$RUNNER_TEMP/devkits.json")
+          curl -fsSL --retry 5 -o "$RUNNER_TEMP/devkit.tar.xz" "$url"
+          echo "$sha  $RUNNER_TEMP/devkit.tar.xz" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/devkit"
+          tar -xJf "$RUNNER_TEMP/devkit.tar.xz" -C "$RUNNER_TEMP/devkit" --strip-components=1 --wildcards '*/zig/*'
+          rm "$RUNNER_TEMP/devkit.tar.xz"
+          echo "$RUNNER_TEMP/devkit/zig" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/devkit/zig/zig" version
+
+      - name: Zig source is formatted (zig fmt)
+        run: zig fmt --check build build.zig build.zig.zon
+
+      - name: Unit tests of the build tools
+        run: zig build test --summary failures
+
+      # package.nls.json and l10n/bundle.l10n.json (build/generated.zig)
+      - name: Generated files are up to date
+        run: zig build check-generated
+
+      - name: Package the extension
+        run: zig build package-vscode -- dist
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  test:
+    name: VS Code (${{ matrix.os }})
+    needs: [version, build]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15, windows-2025]
+    env:
+      CESIUM_VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.version.outputs.sha }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist
+
+      - name: VS Code's libraries and a display (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libnss3 libgbm1 libasound2t64 libgtk-3-0t64 libxss1 libsecret-1-0
+
+      # The universal VSIX, unpacked as VS Code would install it, in a
+      # downloaded VS Code (test/runTest.ts, test/suite.ts)
+      - name: The packaged extension in VS Code
+        env:
+          VSIX: dist/vscode-cesium-v${{ needs.version.outputs.version }}-universal.vsix
+        run: |
+          py=python3
+          if [ "$RUNNER_OS" = Windows ]; then py=python; fi
+          "$py" -m zipfile -e "$VSIX" "$RUNNER_TEMP/vsix"
+          npm ci --no-audit --no-fund
+          npm run build-test
+          export CESIUM_EXTENSION_PATH="$RUNNER_TEMP/vsix/extension"
+          run_vscode() {
+            if [ "$RUNNER_OS" = Linux ]; then
+              xvfb-run -a node out/runTest.js
+            else
+              node out/runTest.js
+            fi
+          }
+          # a VS Code window that hangs while starting on the runner fails
+          # the run before the test begins; a broken extension fails both
+          if ! run_vscode; then
+            echo "::warning::the VS Code test failed; running it once more"
+            run_vscode
+          fi
+
+  # The check the rulesets require: passes when no job before it failed or
+  # was cancelled
+  ci-result:
+    name: CI
+    needs: [version, build, test]
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Results of the jobs before
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          echo "$RESULTS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"' | tee -a "$GITHUB_STEP_SUMMARY"
+          bad=$(echo "$RESULTS" | jq -r '[to_entries[] | select(.value.result == "failure" or .value.result == "cancelled") | .key] | join(", ")')
+          if [ -n "$bad" ]; then
+            echo "::error::failed or cancelled: $bad"
+            exit 1
+          fi
+
+  release:
+    name: Release v${{ needs.version.outputs.version }}
+    needs: [version, build, test]
+    if: >-
+      ${{ !cancelled() && needs.version.outputs.release == 'true'
+      && needs.build.result == 'success' && needs.test.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      SHA: ${{ needs.version.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.version.outputs.sha }}
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist
+
+      # the platform packages are checked here too once there are any (#7)
+      - name: Check the packages
+        run: |
+          ls -l dist
+          if [ ! -f "dist/vscode-cesium-v$VERSION-universal.vsix" ]; then
+            echo "::error::no universal VSIX at version $VERSION"
+            exit 1
+          fi
+
+      - name: Tag the tested commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "v$VERSION" -m "vscode-cesium v$VERSION" "$SHA"
+          git push origin "v$VERSION"
+          (cd dist && sha256sum -- * > SHA256SUMS)
+
+      # every build while the server is zcsls is a pre-release (#3)
+      - name: Publish the pre-release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: v${{ needs.version.outputs.version }}
+          name: Cesium for VS Code v${{ needs.version.outputs.version }}
+          files: dist/*
+          generate_release_notes: true
+          prerelease: true
+
+  # The next version is begun on dev: main keeps the version it released. A
+  # separate job, so that a push dev refuses does not stop the publishing.
+  begin-next-version:
+    name: Merge v${{ needs.version.outputs.version }} into dev and begin the next version
+    needs: [version, release]
+    if: ${{ !cancelled() && needs.release.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      SHA: ${{ needs.version.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.version.outputs.sha }}
+          fetch-depth: 0
+
+      # A fast-forward when dev has not moved, else a merge commit
+      - name: Merge into dev and begin the next version
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          tagged() { git rev-parse -q --verify "refs/tags/v$1" >/dev/null; }
+          for attempt in 1 2 3; do
+            git fetch -q --tags origin dev
+            git checkout -q -B dev origin/dev
+            if ! git merge -q -m "Merge v$VERSION into dev [skip ci]" "$SHA"; then
+              git merge --abort
+              echo "::error::v$VERSION conflicts with dev; merge main into dev by hand and set the next version"
+              exit 1
+            fi
+            version=$(sed -nE 's/^\s*\.version = "([^"]+)",/\1/p' build.zig.zon)
+            if tagged "$version"; then
+              next=$version
+              while tagged "$next"; do
+                IFS=. read -r ma mi pa <<< "$next"
+                next="$ma.$mi.$((pa + 1))"
+              done
+              sed -i -E "s/^(\s*\.version = \")[^\"]+(\",)/\1$next\2/" build.zig.zon
+              git commit -qam "Begin v$next development [skip ci]"
+            fi
+            if git push -q origin dev; then exit 0; fi
+            echo "dev moved while merging; trying again"
+          done
+          echo "::error::could not push to dev"
+          exit 1
+
+  publish-extension:
+    name: Publish VS Code extension v${{ needs.version.outputs.version }}
+    needs: [version, release]
+    if: ${{ !cancelled() && needs.release.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    # Each registry has its own workflow, which takes the packages from the
+    # release: open-vsx.yml, the workflow Open VSX trusts by name, and
+    # marketplace.yml, the one the Marketplace's Trusted Publishing policy
+    # names. Both can also be run by hand for any released version.
+    permissions:
+      actions: write
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - name: Start publishing to Open VSX and the Marketplace
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for wf in open-vsx.yml marketplace.yml; do
+            gh workflow run "$wf" --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME" -f version="$VERSION"
+          done

@@ -6,3 +6,5 @@ out/
 bin/
 .vscode-test/
 *.vsix
+.zig-cache/
+zig-out/
