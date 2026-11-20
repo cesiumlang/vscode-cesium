@@ -1,0 +1,16 @@
+.{
+    .name = .vscode_cesium,
+    .fingerprint = 0x6307147049d9dab3,
+    // the version of the next release, the extension's (and, with zcsls,
+    // the server's); while the server is zcsls it is 0.<odd>.<patch>, a
+    // pre-release (#3)
+    .version = "0.1.0",
+    .minimum_zig_version = "0.17.1",
+    .dependencies = .{},
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "build",
+        "LICENSE",
+    },
+}
