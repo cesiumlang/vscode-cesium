@@ -193,9 +193,8 @@ jobs:
           path: dist
 
       # cesium1 for the diagnostics test, built from cesiumlang/cesium dev
-      # with its devkit, as its own CI builds it. cesium1 is built only by
-      # `zig build test` there (not installed), so the corpus runs too, and
-      # cesium1 is taken from the build cache.
+      # with its devkit: `zig build` installs it to zig-out/bin
+      # (cesiumlang/cesium#81).
       - uses: actions/checkout@v7
         with:
           repository: cesiumlang/cesium
@@ -212,16 +211,15 @@ jobs:
         working-directory: cesium-compiler
         run: |
           python tools/fetch-devkit.py
-          .devkit/zig/zig build test --summary failures
+          .devkit/zig/zig build --summary failures
           exe=cesium1
           if [ "$RUNNER_OS" = Windows ]; then exe=cesium1.exe; fi
-          found=$(find .zig-cache/o -type f -name "$exe" | head -1)
-          if [ -z "$found" ]; then
-            echo "::error::no $exe in the build cache"
+          if [ ! -f "zig-out/bin/$exe" ]; then
+            echo "::error::zig build installed no $exe in zig-out/bin"
             exit 1
           fi
           mkdir -p "$RUNNER_TEMP/compilers"
-          cp "$found" "$RUNNER_TEMP/compilers/"
+          cp "zig-out/bin/$exe" "$RUNNER_TEMP/compilers/"
           echo "$RUNNER_TEMP/compilers" >> "$GITHUB_PATH"
 
       - name: Without cesium1, the diagnostics test is skipped
