@@ -6,5 +6,6 @@
   "config.cesium.compiler.path.markdownDescription": "The bootstrap compiler the language server checks units with: `cesium1` or `cesium0`, or a directory that holds one. Empty: `cesium1`, else `cesium0`, on the `PATH`. A name starting with `cesium0` is run as `cesium0`.",
   "config.cesium.trace.server.description": "Log the messages between VS Code and the language server in its output channel.",
   "command.cesium.restartServer.title": "Restart Language Server",
-  "command.category": "Cesium"
+  "command.category": "Cesium",
+  "config.cesium.diagnosticsChangeDelay.markdownDescription": "Milliseconds without a change before an edited unit is checked again (0: with each change; negative: only when a file is opened or saved). For editors that do not ask the language server for diagnostics themselves; VS Code asks for them as you type."
 }

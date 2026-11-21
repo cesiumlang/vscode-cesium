@@ -5,6 +5,7 @@ EBNF
 envrc
 esbuild
 musl
+Neovim
 OVSX
 vscodeignore
 vsix

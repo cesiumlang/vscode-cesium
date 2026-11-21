@@ -94,6 +94,12 @@
           "scope": "machine-overridable",
           "markdownDescription": "%config.cesium.compiler.path.markdownDescription%"
         },
+        "cesium.diagnosticsChangeDelay": {
+          "type": "integer",
+          "default": 300,
+          "scope": "window",
+          "markdownDescription": "%config.cesium.diagnosticsChangeDelay.markdownDescription%"
+        },
         "cesium.trace.server": {
           "type": "string",
           "enum": [

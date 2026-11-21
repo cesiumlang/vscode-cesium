@@ -7,10 +7,12 @@
 //!   zcsls --version   print the version
 
 const std = @import("std");
+const sysinfo = @import("builtin");
 const Io = std.Io;
 const build_options = @import("build_options");
-const jsonrpc = @import("jsonrpc.zig");
 const stdio = @import("stdio.zig");
+const pending = @import("pending.zig");
+const Inbox = @import("inbox.zig").Inbox;
 const Server = @import("server.zig").Server;
 
 pub fn main(init: std.process.Init) !u8 {
@@ -31,8 +33,16 @@ pub fn main(init: std.process.Init) !u8 {
         return 2;
     }
 
-    var in_buf: [64 * 1024]u8 = undefined;
-    var reader = stdio.stdin().readerStreaming(io, &in_buf);
+    var inbox: Inbox = .{ .gpa = gpa, .io = io };
+    var reading = io.concurrent(Inbox.read, .{&inbox}) catch |e| {
+        std.debug.print("zcsls: reading standard input: {t}\n", .{e});
+        return 1;
+    };
+    // the input can still be open after `exit`
+    defer {
+        reading.cancel(io);
+        inbox.deinit();
+    }
     var out_buf: [64 * 1024]u8 = undefined;
     var writer = stdio.stdout().writerStreaming(io, &out_buf);
     var server: Server = .{
@@ -41,6 +51,7 @@ pub fn main(init: std.process.Init) !u8 {
         .out = &writer.interface,
         .version = build_options.version,
         .path_env = init.environ_map.get("PATH"),
+        .home = init.environ_map.get(if (sysinfo.os.tag == .windows) "USERPROFILE" else "HOME"),
     };
     defer server.deinit();
 
@@ -49,14 +60,24 @@ pub fn main(init: std.process.Init) !u8 {
     while (server.running) {
         _ = arena.reset(.retain_capacity);
         const a = arena.allocator();
-        const body = jsonrpc.readMessage(a, &reader.interface) catch |e| {
-            std.debug.print("zcsls: reading a message: {t}\n", .{e});
-            return 1;
-        } orelse break;
-        server.handle(a, body) catch |e| {
-            std.debug.print("zcsls: {t}\n", .{e});
-            return 1;
-        };
+        switch (inbox.next(pending.next(&server))) {
+            .message => |body| {
+                defer gpa.free(body);
+                server.handle(a, body) catch |e| {
+                    std.debug.print("zcsls: {t}\n", .{e});
+                    return 1;
+                };
+            },
+            .timeout => pending.checkDue(&server, a) catch |e| {
+                std.debug.print("zcsls: {t}\n", .{e});
+                return 1;
+            },
+            .end => break,
+            .failed => |e| {
+                std.debug.print("zcsls: reading a message: {t}\n", .{e});
+                return 1;
+            },
+        }
     }
     return server.exitCode();
 }
@@ -69,5 +90,6 @@ test {
     _ = @import("line_map.zig");
     _ = @import("compiler.zig");
     _ = @import("diagnostics.zig");
+    _ = @import("settings.zig");
     _ = @import("_test/server_test.zig");
 }

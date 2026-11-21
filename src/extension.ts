@@ -1,6 +1,7 @@
 // Cesium for VS Code: a thin client of the language server, as zfls's is
-// (#2). It finds the server, starts it for Cesium files, and restarts it
-// when a setting changes or on the command; everything else is the
+// (#2). It finds the server and starts it for Cesium files, passes the
+// cesium.* settings to it at start-up and when they change, and restarts it
+// when cesium.server.path changes or on the command; everything else is the
 // server's. Highlighting, comments, brackets and indentation are declared in
 // package.json.
 
@@ -8,8 +9,8 @@ import * as vscode from "vscode";
 import { LanguageClient, LanguageClientOptions, ServerOptions } from "vscode-languageclient/node";
 import { ensureExecutable, findServer, resolveSetting, SERVER_NAME } from "./executable";
 
-/** The settings the server is started with: a change restarts it */
-const SERVER_SETTINGS = ["cesium.server.path", "cesium.compiler.path"];
+/** The setting that names the server: a change restarts it */
+const SERVER_PATH = "cesium.server.path";
 
 let context: vscode.ExtensionContext;
 let output: vscode.LogOutputChannel;
@@ -24,8 +25,8 @@ export async function activate(ctx: vscode.ExtensionContext): Promise<void> {
     output,
     vscode.commands.registerCommand("cesium.restartServer", () => restart()),
     vscode.workspace.onDidChangeConfiguration((e) => {
-      if (SERVER_SETTINGS.some((s) => e.affectsConfiguration(s))) {
-        output.info("A setting of the language server changed: restarting it");
+      if (e.affectsConfiguration(SERVER_PATH)) {
+        output.info(`${SERVER_PATH} changed: restarting the language server`);
         void restart();
       }
     }),
@@ -92,9 +93,12 @@ async function start(): Promise<void> {
       { scheme: "file", language: "cesium" },
       { scheme: "untitled", language: "cesium" },
     ],
-    initializationOptions: {
-      compiler: { path: resolveSetting(config.get<string>("compiler.path", ""), base) },
-    },
+    // the server takes the settings as they are and resolves their paths;
+    // later changes are sent to it (workspace/didChangeConfiguration)
+    initializationOptions: { cesium: vscode.workspace.getConfiguration().get("cesium") },
+    synchronize: { configurationSection: "cesium" },
+    // vscode-languageclient pulls diagnostics only on open by default
+    diagnosticPullOptions: { onChange: true, onSave: true },
     outputChannel: output,
   };
   const c = new LanguageClient("cesium", vscode.l10n.t("Cesium Language Server"), serverOptions, clientOptions);

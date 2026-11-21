@@ -1,11 +1,12 @@
 //! Diagnostics from the bootstrap compilers: the unit of a document is
 //! checked (unit.zig), the compiler's messages are placed in its files
 //! (messages.zig, line_map.zig), and each file of the unit gets its
-//! diagnostics published, an empty list clearing earlier ones.
+//! diagnostics, by pull (pull.zig) or published, an empty list clearing
+//! earlier ones.
 //!
-//! A check runs when a document is opened or saved. `cesium1` reads the
-//! text of the open documents, unsaved edits included; `cesium0` reads the
-//! files on disk, so it sees only what is saved.
+//! When a check runs is documents.zig's. `cesium1` reads the text of the
+//! open documents, unsaved edits included; `cesium0` reads the files on
+//! disk, so it sees only what is saved.
 
 const std = @import("std");
 const Allocator = std.mem.Allocator;
@@ -15,6 +16,7 @@ const unit = @import("unit.zig");
 const compiler = @import("compiler.zig");
 const messages = @import("messages.zig");
 const line_map = @import("line_map.zig");
+const pending = @import("pending.zig");
 const server_mod = @import("server.zig");
 
 const Server = server_mod.Server;
@@ -30,10 +32,46 @@ pub const Source = struct {
 /// Checks the unit of the open document `uri` and publishes the
 /// diagnostics of its files; `a` is freed after the message
 pub fn check(s: *Server, a: Allocator, uri: []const u8) server_mod.Error!void {
-    const doc = s.docs.get(uri) orelse return;
-    const c = s.compiler orelse return;
+    const sources = try run(s, a, uri) orelse return;
+    pending.settle(s, sources);
+    try publish(s, a, sources, false);
+}
+
+/// Checks the units of the open documents (those at `only`, when given),
+/// each once, and publishes their diagnostics
+pub fn checkOpen(s: *Server, a: Allocator, only: ?[]const []const u8) server_mod.Error!void {
+    var uris: std.ArrayList([]const u8) = .empty;
+    var it = s.docs.iterator();
+    while (it.next()) |e| {
+        if (only) |paths| {
+            const p = e.value_ptr.path orelse continue;
+            if (!contains(paths, p)) continue;
+        }
+        try uris.append(a, try a.dupe(u8, e.key_ptr.*));
+    }
+    var done: std.StringHashMapUnmanaged(void) = .empty;
+    for (uris.items) |uri| {
+        if (done.contains(uri)) continue;
+        const sources = try run(s, a, uri) orelse continue;
+        for (sources) |src| try done.put(a, src.uri, {});
+        pending.settle(s, sources);
+        try publish(s, a, sources, false);
+    }
+}
+
+fn contains(paths: []const []const u8, path: []const u8) bool {
+    for (paths) |p| if (std.mem.eql(u8, p, path)) return true;
+    return false;
+}
+
+/// Checks the unit of the open document `uri`: its files with their
+/// diagnostics, null when it is not checked (no compiler, no document, or
+/// `cesium0` and a document that is no file)
+pub fn run(s: *Server, a: Allocator, uri: []const u8) server_mod.Error!?[]Source {
+    const doc = s.docs.get(uri) orelse return null;
+    const c = s.compiler orelse return null;
     const sources = try unitSources(s, a, uri, doc);
-    if (sources.len == 0) return;
+    if (sources.len == 0) return null;
     // the document itself, for messages without a place
     var own: usize = 0;
     for (sources, 0..) |src, i| if (std.mem.eql(u8, src.uri, uri)) {
@@ -44,10 +82,11 @@ pub fn check(s: *Server, a: Allocator, uri: []const u8) server_mod.Error!void {
     const joined = try line_map.join(a, texts);
     // cesium0 reads files only: a document that is not one is not checked
     const paths = try a.alloc([]const u8, sources.len);
-    for (sources, paths) |src, *p| p.* = src.path orelse if (c.kind == .cesium0) return else "";
+    for (sources, paths) |src, *p| p.* = src.path orelse if (c.kind == .cesium0) return null else "";
 
     const out = compiler.run(a, s.io, c, paths, joined.input) catch |e| {
-        return s.log(a, 1, "cannot run {s}: {t}", .{ c.path, e });
+        try s.log(a, 1, "cannot run {s}: {t}", .{ c.path, e });
+        return null;
     };
     switch (out.term) {
         .exited => |code| if (code > 2) try s.log(a, 1, "{s} ended with exit code {d}", .{ c.path, code }),
@@ -62,7 +101,7 @@ pub fn check(s: *Server, a: Allocator, uri: []const u8) server_mod.Error!void {
         const first = std.mem.trimEnd(u8, out.messages[0 .. std.mem.findScalar(u8, out.messages, '\n') orelse out.messages.len], "\r");
         try s.log(a, 1, "{s} failed without a message: {s}", .{ c.path, first });
     }
-    try publish(s, a, sources);
+    return sources;
 }
 
 /// The files of the unit of `doc`, with the text of the open ones
@@ -131,9 +170,11 @@ fn place(sources: []const Source, texts: []const []const u8, starts: []const usi
 }
 
 /// Publishes the diagnostics of every file of the unit that has some, or
-/// had some published before
-fn publish(s: *Server, a: Allocator, sources: []Source) server_mod.Error!void {
+/// had some published before; `closed_only`: of those that are not open
+/// documents
+pub fn publish(s: *Server, a: Allocator, sources: []Source, closed_only: bool) server_mod.Error!void {
     for (sources) |src| {
+        if (closed_only and s.docs.contains(src.uri)) continue;
         const had = s.published.contains(src.uri);
         if (src.diagnostics.items.len == 0 and !had) continue;
         const version = if (s.docs.get(src.uri)) |d| d.version else null;
@@ -152,4 +193,27 @@ fn publish(s: *Server, a: Allocator, sources: []Source) server_mod.Error!void {
             if (s.published.fetchRemove(src.uri)) |kv| s.gpa.free(kv.key);
         }
     }
+}
+
+/// Clears what was published of the file at `path`
+pub fn forget(s: *Server, a: Allocator, path: []const u8) server_mod.Error!void {
+    var it = s.published.keyIterator();
+    while (it.next()) |k| {
+        const p = try uri_mod.toPath(a, k.*, s.style) orelse continue;
+        if (!uri_mod.samePath(s.style, p, path)) continue;
+        const key = k.*;
+        s.published.removeByPtr(k);
+        defer s.gpa.free(key);
+        return s.notify(a, "textDocument/publishDiagnostics", lsp.PublishDiagnosticsParams{ .uri = key, .diagnostics = &.{} });
+    }
+}
+
+/// Clears everything published (no compiler any more)
+pub fn clearAll(s: *Server, a: Allocator) server_mod.Error!void {
+    var it = s.published.keyIterator();
+    while (it.next()) |k| {
+        try s.notify(a, "textDocument/publishDiagnostics", lsp.PublishDiagnosticsParams{ .uri = k.*, .diagnostics = &.{} });
+        s.gpa.free(k.*);
+    }
+    s.published.clearRetainingCapacity();
 }
