@@ -20,7 +20,7 @@ The extension starts the language server when a Cesium file is opened, as a thin
 - **Output:** the output channel "Cesium Language Server" has the client's log and the server's.
 - **Untrusted workspaces:** supported, but the workspace's values of `cesium.server.path` and `cesium.compiler.path`, which name programs to run, are ignored there. **Virtual workspaces:** highlighting only; the server reads files from disk, so it serves files and untitled documents only.
 
-## Zcsls
+## `zcsls`
 
 `zcsls` (`server/`) speaks the Language Server Protocol over standard input and output, so any editor can use it. The requests it answers are those `cesium lsp` must answer later: `initialize`, `initialized`, `shutdown`, `exit`, full text sync (`textDocument/didOpen`, `didChange`, `didSave`, `didClose`), and it sends `textDocument/publishDiagnostics`. The name is temporary: settings and commands are `cesium.*`.
 
@@ -106,8 +106,8 @@ Each release is published, as `cesiumlang.cesium`, on the GitHub releases page, 
 
 #### What already exists (checked 2026-11-20)
 
-- **Marketplace publisher `cesiumlang`**, display name "Cesium Language", verified. Zfls publishes under it (`cesiumlang.zfls`).
-- **Open VSX namespace `cesiumlang`**, verified. Zfls publishes under it.
+- **Marketplace publisher `cesiumlang`**, display name "Cesium Language", verified; zfls publishes under it (`cesiumlang.zfls`).
+- **Open VSX namespace `cesiumlang`**, verified; zfls publishes under it.
 - **The name `cesiumlang.cesium` is free** on both registries. Neither registry reserves an extension name ahead of time: the first publication creates the extension, and from then on its identifier cannot change.
 
 So nothing is registered from scratch. What this repository needs is trust on both registries, because each trust names the repository and the workflow file, and the existing entries name zfls.
