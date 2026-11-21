@@ -30,7 +30,7 @@ In [cesiumlang/cesium](https://github.com/cesiumlang/cesium):
 
 ## Checking code
 
-- Build the compilers from a clone of cesiumlang/cesium: `python tools/fetch-devkit.py`, then `.devkit/zig/zig build` installs `cesium0` and `cesium1` to `zig-out/bin`.
+- Build the compilers from a clone of cesiumlang/cesium: `bash tools/fetch-devkit.sh`, then `.devkit/zig/zig build` installs `cesium0` and `cesium1` to `zig-out/bin`.
 - `cesium0 --emit-mir -o out.mir a.csm b.csm` checks S0 and reports every error as `file:line:col: error: message` (see the bootstrap README for the exact form).
 - `cat a.csm b.csm | cesium1` checks the same unit and stops at the first error; its line numbers count from the start of the joined input.
 - With this plugin's language server, `zcsls`, on the `PATH` and a compiler on the `PATH` too, the errors come back as diagnostics after every edit of a `.csm` file.

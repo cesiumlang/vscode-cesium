@@ -203,16 +203,12 @@ jobs:
           ref: dev
           path: cesium-compiler
 
-      - uses: actions/setup-python@v7
-        with:
-          python-version: "3.12"
-
       # the devkit of cesiumlang/cesium dev, for cesium1 and for the tests of
       # zcsls on this platform
       - name: The devkit
         working-directory: cesium-compiler
         run: |
-          python tools/fetch-devkit.py
+          bash tools/fetch-devkit.sh
           if ! cmp -s ../devkit-version devkit-version; then
             echo "::warning::cesiumlang/cesium dev uses devkit $(cat devkit-version), this repository $(cat ../devkit-version)"
           fi
@@ -255,9 +251,15 @@ jobs:
           VSIX: dist/vscode-cesium-v${{ needs.version.outputs.version }}-${{ matrix.platform }}.vsix
           CESIUM_DIAGNOSTICS: ${{ steps.cesium1.outcome == 'success' && '1' || '' }}
         run: |
-          py=python3
-          if [ "$RUNNER_OS" = Windows ]; then py=python; fi
-          "$py" -m zipfile -e "$VSIX" "$RUNNER_TEMP/vsix"
+          mkdir -p "$RUNNER_TEMP/vsix"
+          # unzip, else a bsdtar (Windows' tar.exe, macOS' tar), which reads zip
+          if command -v unzip > /dev/null; then
+            unzip -q "$VSIX" -d "$RUNNER_TEMP/vsix"
+          elif [ -x /c/Windows/System32/tar.exe ]; then
+            /c/Windows/System32/tar.exe -xf "$VSIX" -C "$RUNNER_TEMP/vsix"
+          else
+            tar -xf "$VSIX" -C "$RUNNER_TEMP/vsix"
+          fi
           npm ci --no-audit --no-fund
           npm run build-test
           export CESIUM_EXTENSION_PATH="$RUNNER_TEMP/vsix/extension"
