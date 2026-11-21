@@ -126,27 +126,14 @@ Each release is published, as `cesiumlang.cesium`, on the GitHub releases page, 
 - **Marketplace identity** (`.github/workflows/marketplace-identity.yml`): run by hand once, on `main`, to set up the fallback identity; it signs in as the managed identity of the `AZURE_*` variables and prints the ID to add to the publisher.
 - The release notes are generated from the pull requests merged since the last release, in sections by label (`.github/release.yml`): `fix` or `bug`, `feature` or `enhancement`, `performance`, `tests`, `refactor` and `ci`. `skip-changelog` leaves a pull request out, for example the `dev` to `main` pull request of a release.
 
-#### What already exists (checked 2026-11-20)
-
-- **Marketplace publisher `cesiumlang`**, display name "Cesium Language", verified; zfls publishes under it (`cesiumlang.zfls`).
-- **Open VSX namespace `cesiumlang`**, verified; zfls publishes under it.
-- **The name `cesiumlang.cesium` is free** on both registries. Neither registry reserves an extension name ahead of time: the first publication creates the extension, and from then on its identifier cannot change.
-
-So nothing is registered from scratch. What this repository needs is trust on both registries, because each trust names the repository and the workflow file, and the existing entries name zfls.
-
 #### Setup in the registries
 
-These steps are in the registries' and Azure's web interfaces, signed in with the account that manages the publisher and the namespace. Each is needed once for this repository.
+The Marketplace publisher `cesiumlang` (display name "Cesium Language") and the Open VSX namespace `cesiumlang` already exist and are verified; zfls publishes under both. The first publication of `cesiumlang.cesium` creates the extension, and its identifier cannot change after that. Trust names this repository and the workflow file, so the entries of zfls do not cover it, and trusted publishing can be set up only for an extension that exists. The order is therefore:
 
-**Visual Studio Marketplace** (publisher management page of `cesiumlang`)
-
-- **Trusted Publishing policy** for the GitHub repository `cesiumlang/vscode-cesium` and the workflow file `marketplace.yml`. The policy for zfls names zfls's repository and does not cover this one. With it, `vsce publish --oidc` exchanges the workflow's GitHub OIDC token for a short-lived credential; nothing is stored.
-- **Fallback identity**, used only if Trusted Publishing is refused: in Azure, add a federated credential for this repository (its `main` branch, as zfls's trusts zfls's `main`) to the Microsoft Entra managed identity, or create one for it. Set the repository variables `AZURE_CLIENT_ID`, `AZURE_TENANT_ID` and `AZURE_SUBSCRIPTION_ID` here. Then run the "Marketplace identity" workflow once on `main`; it prints the ID to add to the publisher as a member with the Contributor role. If zfls's identity is reused, it is already a member and only the federated credential and the variables are new.
-
-**Open VSX** (namespace `cesiumlang`)
-
-- **Trusted publishing** for this repository's workflow `open-vsx.yml` in the namespace `cesiumlang`. With it, `ovsx publish --trusted-publishing` uses the workflow's OIDC token; nothing is stored.
-- **Fallback token**, optional: an Open VSX access token as the repository secret `OVSX_PAT`, used only if trusted publishing is refused. The zfls one can be reused.
+1. **The first release** (`v0.1.0`, a push to `main`) creates the GitHub pre-release with every VSIX and starts both publishing workflows.
+2. **Open VSX:** the first run falls back to the repository secret `OVSX_PAT` (an Open VSX access token; set on 2026-11-20), which creates the extension. Then allow trusted publishing for `open-vsx.yml` in the namespace `cesiumlang`; the secret stays as the fallback only.
+3. **Marketplace:** a Trusted Publishing policy for this repository and `marketplace.yml` exists on the publisher (set on 2026-11-20). If the Marketplace still refuses because the extension does not exist yet, upload the release's own universal VSIX on the publisher page (New extension, Visual Studio Code), then run the workflow again for the platform packages. Upload nothing built elsewhere: a version that is already published is skipped, so the release's contents would not be published under it.
+4. **Fallback identity** for the Marketplace, optional, used only if Trusted Publishing is refused: in Azure, add a federated credential for this repository (its `main` branch) to the Microsoft Entra managed identity, set the repository variables `AZURE_CLIENT_ID`, `AZURE_TENANT_ID` and `AZURE_SUBSCRIPTION_ID`, and run the "Marketplace identity" workflow once on `main`; it prints the ID to add to the publisher as a member with the Contributor role.
 
 ### Where the files come from
 
