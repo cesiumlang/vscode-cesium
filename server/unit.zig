@@ -1,6 +1,6 @@
 //! What compilation unit a file belongs to, and the order of its files.
 //!
-//! Not decided yet (cesiumlang/vscode-cesium#7, deferred by Randy). The
+//! Not decided yet (cesiumlang/vscode-cesium#7, deferred by emanspeaks). The
 //! interim rule: every `.csm` file in the directory of the file, in byte
 //! order of their names. Only `files` knows it, so that it can change.
 
