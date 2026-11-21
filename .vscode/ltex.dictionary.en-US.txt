@@ -1,5 +1,14 @@
 cesiumlang
+direnv
+Dplatforms
+EBNF
+envrc
+esbuild
+musl
+Neovim
 OVSX
+vscodeignore
 vsix
 VSIX
+zcsls
 zfls

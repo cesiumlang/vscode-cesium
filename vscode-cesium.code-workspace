@@ -22,6 +22,7 @@
       "**/dist/**": true,
       "**/out/**": true,
       "**/.vscode-test/**": true,
+      "**/.zig-cache/**": true,
     },
     "files.insertFinalNewline": true,
     "editor.wrappingIndent": "indent",
@@ -37,6 +38,9 @@
     },
     "ltex.additionalRules.motherTongue": "en-US",
     "cmake.configureOnOpen": false,
+    // the Zig of the Cesium devkit, in the compiler's checkout next to this
+    // one in cesium-workspace (python tools/fetch-devkit.py there)
+    "zig.path": "${workspaceFolder}/../cesium-src/.devkit/zig/zig",
   },
   "extensions": {
     "recommendations": [

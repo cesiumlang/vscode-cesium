@@ -1,0 +1,139 @@
+{
+  "name": "cesium",
+  "displayName": "%displayName%",
+  "description": "%description%",
+  "version": "0.0.0",
+  "publisher": "cesiumlang",
+  "license": "MIT",
+  "icon": "icons/cesium.png",
+  "galleryBanner": {
+    "color": "#161618",
+    "theme": "dark"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cesiumlang/vscode-cesium"
+  },
+  "bugs": {
+    "url": "https://github.com/cesiumlang/vscode-cesium/issues"
+  },
+  "homepage": "https://cesiumlang.org",
+  "categories": [
+    "Programming Languages"
+  ],
+  "keywords": [
+    "cesium",
+    "csm",
+    "csi"
+  ],
+  "engines": {
+    "vscode": "^1.147.0"
+  },
+  "main": "./dist/extension.js",
+  "l10n": "./l10n",
+  "activationEvents": [],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "In an untrusted workspace, the workspace settings that name programs to run (cesium.server.path, cesium.compiler.path) are ignored.",
+      "restrictedConfigurations": [
+        "cesium.server.path",
+        "cesium.compiler.path"
+      ]
+    },
+    "virtualWorkspaces": {
+      "supported": "limited",
+      "description": "The language server reads the files of a unit from disk, so there are no diagnostics in virtual workspaces."
+    }
+  },
+  "contributes": {
+    "languages": [
+      {
+        "id": "cesium",
+        "aliases": [
+          "Cesium",
+          "cesium"
+        ],
+        "extensions": [
+          ".csm",
+          ".csi"
+        ],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./icons/cesium.svg",
+          "dark": "./icons/cesium.svg"
+        }
+      }
+    ],
+    "grammars": [
+      {
+        "language": "cesium",
+        "scopeName": "source.cesium",
+        "path": "./grammar/cesium.tmGrammar.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "cesium.restartServer",
+        "title": "%command.cesium.restartServer.title%",
+        "category": "%command.category%"
+      }
+    ],
+    "configuration": {
+      "title": "%configuration.title%",
+      "properties": {
+        "cesium.server.path": {
+          "type": "string",
+          "default": "",
+          "scope": "machine-overridable",
+          "markdownDescription": "%config.cesium.server.path.markdownDescription%"
+        },
+        "cesium.compiler.path": {
+          "type": "string",
+          "default": "",
+          "scope": "machine-overridable",
+          "markdownDescription": "%config.cesium.compiler.path.markdownDescription%"
+        },
+        "cesium.diagnosticsChangeDelay": {
+          "type": "integer",
+          "default": 300,
+          "scope": "window",
+          "markdownDescription": "%config.cesium.diagnosticsChangeDelay.markdownDescription%"
+        },
+        "cesium.trace.server": {
+          "type": "string",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "default": "off",
+          "scope": "window",
+          "description": "%config.cesium.trace.server.description%"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "build": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --target=node24 --minify --sourcemap",
+    "typecheck": "tsc --noEmit -p . && tsc --noEmit -p test",
+    "build-test": "esbuild test/runTest.ts --bundle --outfile=out/runTest.js --platform=node --target=node24 && esbuild test/suite.ts --bundle --outfile=out/suite.js --external:vscode --format=cjs --platform=node --target=node24",
+    "test": "npm run build && npm run build-test && node out/runTest.js",
+    "unit": "esbuild test/unit/*.test.ts --bundle --outdir=out/unit --platform=node --target=node24 --format=cjs && node --test out/unit/*.test.js"
+  },
+  "overrides": {
+    "minimatch": "11.0.9"
+  },
+  "dependencies": {
+    "vscode-languageclient": "11.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "@types/vscode": "1.146.0",
+    "@vscode/test-electron": "3.1.0",
+    "@vscode/vsce": "4.1.1",
+    "esbuild": "0.28.2",
+    "typescript": "7.0.2"
+  }
+}
