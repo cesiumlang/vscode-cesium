@@ -1,0 +1,15 @@
+{
+  "name": "cesiumlang",
+  "owner": {
+    "name": "cesiumlang",
+    "url": "https://github.com/cesiumlang"
+  },
+  "description": "Plugins for the Cesium programming language (https://cesiumlang.org).",
+  "plugins": [
+    {
+      "name": "cesium",
+      "source": "./agent-plugin",
+      "description": "zcsls as the language server of .csm and .csi files, and a skill on writing Cesium."
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "name": "cesium",
+  "description": "The Cesium programming language for coding agents: zcsls as the language server of .csm and .csi files, and a skill on writing Cesium.",
+  "author": {
+    "name": "cesiumlang",
+    "url": "https://github.com/cesiumlang"
+  },
+  "homepage": "https://cesiumlang.org",
+  "repository": "https://github.com/cesiumlang/vscode-cesium",
+  "license": "MIT",
+  "keywords": ["cesium", "language-server", "lsp"]
+}

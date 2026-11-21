@@ -1,5 +1,7 @@
 cesiumlang
 direnv
+Dplatforms
+EBNF
 envrc
 esbuild
 musl
