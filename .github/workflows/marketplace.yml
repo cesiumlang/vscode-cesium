@@ -41,7 +41,7 @@ defaults:
 
 jobs:
   publish:
-    name: Publish cesiumlang.cesium v${{ inputs.version }} to the Marketplace
+    name: Publish cesiumlang.vscode-cesium v${{ inputs.version }} to the Marketplace
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
