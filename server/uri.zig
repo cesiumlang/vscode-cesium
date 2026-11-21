@@ -49,6 +49,11 @@ pub fn fromPath(a: Allocator, path: []const u8, style: Style) Allocator.Error![]
     return out.toOwnedSlice(a);
 }
 
+/// Whether two paths name the same file, Windows's without regard to case
+pub fn samePath(style: Style, x: []const u8, y: []const u8) bool {
+    return if (style == .windows) std.ascii.eqlIgnoreCase(x, y) else std.mem.eql(u8, x, y);
+}
+
 /// `s` with its `%XX` escapes decoded
 fn decode(a: Allocator, s: []const u8) Allocator.Error![]u8 {
     var out = try a.alloc(u8, s.len);

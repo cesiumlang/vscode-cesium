@@ -13,7 +13,9 @@ name: CI
 #   it, in a downloaded VS Code on Linux (under xvfb), macOS and Windows:
 #   the extension activates, and its zcsls reports the error of a fixture,
 #   with a cesium1 built from cesiumlang/cesium dev. If cesium1 cannot be
-#   built, that part is skipped with a warning.
+#   built, that part is skipped with a warning. Before it, `zig build test`
+#   with the devkit of cesiumlang/cesium dev: the unit tests of zcsls and
+#   its LSP test, on each platform.
 # - CI: the one check the rulesets require.
 #
 # Versions: build.zig.zon holds the version of the next release. A push to
@@ -205,12 +207,26 @@ jobs:
         with:
           python-version: "3.12"
 
+      # the devkit of cesiumlang/cesium dev, for cesium1 and for the tests of
+      # zcsls on this platform
+      - name: The devkit
+        working-directory: cesium-compiler
+        run: |
+          python tools/fetch-devkit.py
+          if ! cmp -s ../devkit-version devkit-version; then
+            echo "::warning::cesiumlang/cesium dev uses devkit $(cat devkit-version), this repository $(cat ../devkit-version)"
+          fi
+
+      # The unit tests and the LSP test (server/_test/lsp_test.zig), which
+      # drives the built zcsls as a plain client, on each platform
+      - name: Tests of zcsls
+        run: cesium-compiler/.devkit/zig/zig build test --summary failures
+
       - name: cesium1 from cesiumlang/cesium dev
         id: cesium1
         continue-on-error: true
         working-directory: cesium-compiler
         run: |
-          python tools/fetch-devkit.py
           .devkit/zig/zig build --summary failures
           exe=cesium1
           if [ "$RUNNER_OS" = Windows ]; then exe=cesium1.exe; fi

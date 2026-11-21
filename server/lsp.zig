@@ -33,8 +33,16 @@ pub const TextDocumentSyncOptions = struct {
     save: struct { includeText: bool = false } = .{},
 };
 
+/// Pull diagnostics (LSP 3.17): a unit's files depend on each other
+pub const DiagnosticOptions = struct {
+    interFileDependencies: bool = true,
+    workspaceDiagnostics: bool = false,
+};
+
 pub const ServerCapabilities = struct {
     textDocumentSync: TextDocumentSyncOptions = .{},
+    /// only for a client that pulls diagnostics
+    diagnosticProvider: ?DiagnosticOptions = null,
 };
 
 pub const InitializeResult = struct {
@@ -42,14 +50,16 @@ pub const InitializeResult = struct {
     serverInfo: struct { name: []const u8, version: []const u8 },
 };
 
-/// The settings, under the names of the editor's (`cesium.compiler.path`),
-/// in `initializationOptions`
-pub const InitializationOptions = struct {
-    compiler: struct { path: ?[]const u8 = null } = .{},
-};
-
-pub const InitializeParams = struct {
-    initializationOptions: ?InitializationOptions = null,
+/// What the server uses of the client's capabilities
+pub const ClientCapabilities = struct {
+    textDocument: struct {
+        /// present when the client pulls diagnostics
+        diagnostic: ?struct {} = null,
+    } = .{},
+    workspace: struct {
+        didChangeWatchedFiles: struct { dynamicRegistration: bool = false } = .{},
+        diagnostics: struct { refreshSupport: bool = false } = .{},
+    } = .{},
 };
 
 pub const TextDocumentItem = struct {
@@ -71,6 +81,24 @@ pub const DidChangeParams = struct {
 
 /// `didSave` and `didClose`
 pub const TextDocumentParams = struct { textDocument: struct { uri: []const u8 } };
+
+pub const DocumentDiagnosticParams = struct {
+    textDocument: struct { uri: []const u8 },
+    previousResultId: ?[]const u8 = null,
+};
+
+/// `type`: 1 created, 2 changed, 3 deleted
+pub const FileEvent = struct { uri: []const u8, type: u8 };
+
+pub const DidChangeWatchedFilesParams = struct { changes: []const FileEvent };
+
+pub const Registration = struct {
+    id: []const u8,
+    method: []const u8,
+    registerOptions: struct { watchers: []const struct { globPattern: []const u8 } },
+};
+
+pub const RegistrationParams = struct { registrations: []const Registration };
 
 pub const ResponseError = struct { code: i64, message: []const u8 };
 

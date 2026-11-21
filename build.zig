@@ -2,7 +2,8 @@
 //! the extension, in Zig as zfls has them (#3):
 //!
 //!   zig build                         zcsls in zig-out/bin
-//!   zig build test                    the unit tests of zcsls and the tools
+//!   zig build test                    the unit tests of zcsls and the tools,
+//!                                     and the LSP test of zcsls
 //!   zig build package-vscode -- DIST  one VSIX per VS Code platform, each
 //!                                     with its zcsls in bin/, and the
 //!                                     universal VSIX without one
@@ -34,6 +35,7 @@ pub fn build(b: *std.Build) void {
 
     const test_step = b.step("test", "Run the unit tests of zcsls and of the build tools");
     test_step.dependOn(&b.addRunArtifact(b.addTest(.{ .root_module = zcsls.root_module })).step);
+    test_step.dependOn(&b.addRunArtifact(addLspTest(b, target, optimize, zcsls)).step);
     test_step.dependOn(&b.addRunArtifact(addPackageVscode(b)).step);
     test_step.dependOn(&b.addRunArtifact(addGenerated(b)).step);
 }
@@ -51,7 +53,29 @@ fn addZcsls(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.built
     return b.addExecutable(.{ .name = "zcsls", .root_module = mod });
 }
 
-/// `zig build package-vscode -- DIST`: build/package_vscode.zig, run at the
+/// The LSP test (server/_test/lsp_test.zig): `zcsls` driven as a plain
+/// client drives it, with a stand-in for `cesium1`
+fn addLspTest(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, zcsls: *std.Build.Step.Compile) *std.Build.Step.Compile {
+    const fake = b.addExecutable(.{ .name = "fake-cesium1", .root_module = b.createModule(.{
+        .root_source_file = b.path("server/_test/fake_cesium1.zig"),
+        .target = target,
+        .optimize = optimize,
+    }) });
+    const paths = b.addOptions();
+    paths.addOptionPath("zcsls", zcsls.getEmittedBin());
+    paths.addOptionPath("compiler", fake.getEmittedBin());
+    const mod = b.createModule(.{
+        .root_source_file = b.path("server/_test/lsp_test.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    mod.addOptions("lsp_test_paths", paths);
+    mod.addImport("jsonrpc", b.createModule(.{ .root_source_file = b.path("server/jsonrpc.zig") }));
+    mod.addImport("uri", b.createModule(.{ .root_source_file = b.path("server/uri.zig") }));
+    return b.addTest(.{ .root_module = mod });
+}
+
+/// `zig build package-vscode -- DIST`:build/package_vscode.zig, run at the
 /// root of the repository as `package_vscode VERSION PLATFORM=ZCSLS... DIST`
 /// with zcsls built for each platform (none with `-Dplatforms=false`),
 /// safety checks on and debug information stripped.
