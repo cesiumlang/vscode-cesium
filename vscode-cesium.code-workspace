@@ -39,7 +39,7 @@
     "ltex.additionalRules.motherTongue": "en-US",
     "cmake.configureOnOpen": false,
     // the Zig of the Cesium devkit, in the compiler's checkout next to this
-    // one in cesium-workspace (python tools/fetch-devkit.py there)
+    // one in cesium-workspace (bash tools/fetch-devkit.sh there)
     "zig.path": "${workspaceFolder}/../cesium-src/.devkit/zig/zig",
   },
   "extensions": {

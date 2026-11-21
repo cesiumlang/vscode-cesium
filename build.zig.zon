@@ -4,7 +4,7 @@
     // the version of the next release, the extension's (and, with zcsls,
     // the server's); while the server is zcsls it is 0.<odd>.<patch>, a
     // pre-release (#3)
-    .version = "0.1.0",
+    .version = "0.1.1",
     .minimum_zig_version = "0.17.1",
     .dependencies = .{},
     .paths = .{
