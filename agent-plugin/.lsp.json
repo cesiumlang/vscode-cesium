@@ -1,0 +1,9 @@
+{
+  "cesium": {
+    "command": "zcsls",
+    "extensionToLanguage": {
+      ".csm": "cesium",
+      ".csi": "cesium"
+    }
+  }
+}

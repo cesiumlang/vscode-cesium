@@ -20,7 +20,7 @@ The extension starts the language server when a Cesium file is opened, as a thin
 - **Output:** the output channel "Cesium Language Server" has the client's log and the server's.
 - **Untrusted workspaces:** supported, but the workspace's values of `cesium.server.path` and `cesium.compiler.path`, which name programs to run, are ignored there. **Virtual workspaces:** highlighting only; the server reads files from disk, so it serves files and untitled documents only.
 
-## zcsls
+## Zcsls
 
 `zcsls` (`server/`) speaks the Language Server Protocol over standard input and output, so any editor can use it. The requests it answers are those `cesium lsp` must answer later: `initialize`, `initialized`, `shutdown`, `exit`, full text sync (`textDocument/didOpen`, `didChange`, `didSave`, `didClose`), and it sends `textDocument/publishDiagnostics`. The name is temporary: settings and commands are `cesium.*`.
 
@@ -30,6 +30,33 @@ The extension starts the language server when a Cesium file is opened, as a thin
 - **Where errors go.** `cesium1` counts lines from the start of its input, the unit's files one after another (each ending in a line break); `zcsls` maps each line back to its file and line. `cesium0` names the file. Columns are converted to UTF-16, as LSP counts them. A message without a place (the verifier's, a limit of `cesium1`) goes on the first line of the document checked. Each file of the unit gets its diagnostics, and a later check clears those that are gone.
 - **Limits.** `cesium1` stops at the first error, so a unit shows one error at a time; `cesium0` reports every error it finds, but knows only S0. An error at the end of one file can be reported at the start of the next one, as the compiler sees them joined.
 - `zcsls --version` prints its version, which is the extension's (`build.zig.zon`).
+
+## Agent plugin
+
+`agent-plugin/` is a plugin for [Claude Code](https://code.claude.com/docs/en/plugins/code-intelligence) ([#21](https://github.com/cesiumlang/vscode-cesium/issues/21)). It makes `zcsls` the language server of `.csm` and `.csi` files, so an agent gets the compiler's errors after each edit, and it adds the skill `cesium-language`: where the rules of Cesium are written down and how to check code. `.claude-plugin/marketplace.json` makes this repository its marketplace:
+
+```sh
+claude plugin marketplace add cesiumlang/vscode-cesium
+claude plugin install cesium@cesiumlang
+```
+
+- **`zcsls` on the `PATH`.** The plugin does not carry the server: Claude Code starts `zcsls` from the `PATH` of the shell it runs in. `zcsls` comes only inside the platform packages of this extension, in their `bin/`; there are no separate downloads until `cesium lsp` replaces it. Put that directory on the `PATH` before starting Claude Code. It is in VS Code's extensions folder (`~/.vscode/extensions`, `%USERPROFILE%\.vscode\extensions` on Windows, `~/.vscode-insiders/extensions` for Insiders), in a folder named `cesiumlang.cesium-<version>-<platform>`, which changes with every update; these lines pick the newest one:
+
+  ```sh
+  export PATH="$(ls -td ~/.vscode/extensions/cesiumlang.cesium-*/bin | head -n 1):$PATH"
+  ```
+
+  ```powershell
+  $env:PATH = (Get-ChildItem "$HOME\.vscode\extensions\cesiumlang.cesium-*\bin" | Sort-Object LastWriteTime | Select-Object -Last 1).FullName + ";$env:PATH"
+  ```
+
+  Or build it: `zig build` here puts it in `zig-out/bin`.
+- **A compiler on the `PATH`.** Claude Code starts `zcsls` without `initializationOptions`, so it looks for `cesium1`, then `cesium0`, on the same `PATH` (see [zcsls](#zcsls)). Build them from [cesiumlang/cesium](https://github.com/cesiumlang/cesium) (`zig build` installs both to `zig-out/bin`) and put that directory on the `PATH` too. Without a compiler, `zcsls` runs but has no diagnostics.
+- **What it gives.** Diagnostics after each edit. `zcsls` does not answer definitions, references, hover or symbols yet, so Claude Code's LSP tool has nothing for those.
+- **Limits.** Language servers do not run in Claude Code's cloud sessions. In VS Code, Claude Code reads the Problems panel, where the extension's `zcsls` reports already; the plugin matters most for terminal and background agents.
+- **Copilot:** not yet. Copilot CLI reads the language servers of an Agent Plugins 1.0 plugin from `com.github.copilot/lsp.json`, whose contents its documentation does not define yet (checked 2026-11-20).
+- **Checks.** `claude plugin validate` does not read `.lsp.json`. `npm run unit` (`test/unit/plugin.test.ts`, in CI) checks that the plugin's JSON files parse, that the marketplace finds the plugin under its name, that `.lsp.json` starts `zcsls` for `.csm` and `.csi` as the language `cesium` of `package.json`, and that each skill has a name and a description.
+- The skill is the `cesium-language` skill of cesium-workspace with links in place of the workspace's paths. It gives way to the reference that cesiumlang/cesiumlang.org#25 generates, once there is one.
 
 ## Status
 
@@ -79,8 +106,8 @@ Each release is published, as `cesiumlang.cesium`, on the GitHub releases page, 
 
 #### What already exists (checked 2026-11-20)
 
-- **Marketplace publisher `cesiumlang`**, display name "Cesium Language", verified. zfls publishes under it (`cesiumlang.zfls`).
-- **Open VSX namespace `cesiumlang`**, verified. zfls publishes under it.
+- **Marketplace publisher `cesiumlang`**, display name "Cesium Language", verified. Zfls publishes under it (`cesiumlang.zfls`).
+- **Open VSX namespace `cesiumlang`**, verified. Zfls publishes under it.
 - **The name `cesiumlang.cesium` is free** on both registries. Neither registry reserves an extension name ahead of time: the first publication creates the extension, and from then on its identifier cannot change.
 
 So nothing is registered from scratch. What this repository needs is trust on both registries, because each trust names the repository and the workflow file, and the existing entries name zfls.
