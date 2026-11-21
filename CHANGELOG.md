@@ -1,6 +1,10 @@
 # Changelog
 
-## 0.1.0 (unreleased)
+## 0.1.1 (unreleased)
+
+- The extension is now `cesiumlang.vscode-cesium`: the Visual Studio Marketplace does not accept a new extension named `cesium`, which another publisher has. The same identifier is used on Open VSX, where `cesiumlang.cesium` 0.1.0 is withdrawn.
+
+## 0.1.0
 
 - The language `cesium` for `.csm` and `.csi` files, with the TextMate grammar of [cesiumlang/grammar](https://github.com/cesiumlang/grammar).
 - Comments, brackets, auto-closing pairs and indentation rules.

@@ -9,8 +9,8 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 
 export async function run(): Promise<void> {
-  const ext = vscode.extensions.getExtension("cesiumlang.cesium");
-  assert.ok(ext, "the extension cesiumlang.cesium is not installed");
+  const ext = vscode.extensions.getExtension("cesiumlang.vscode-cesium");
+  assert.ok(ext, "the extension cesiumlang.vscode-cesium is not installed");
   await ext.activate();
   const want = process.env.CESIUM_VERSION;
   if (want) assert.equal(ext.packageJSON.version, want, "version of the packaged extension");
@@ -22,7 +22,7 @@ export async function run(): Promise<void> {
     await vscode.window.showTextDocument(doc);
     assert.equal(doc.languageId, "cesium", name);
   }
-  console.log(`cesiumlang.cesium ${ext.packageJSON.version}: .csm and .csi files are cesium`);
+  console.log(`cesiumlang.vscode-cesium ${ext.packageJSON.version}: .csm and .csi files are cesium`);
 
   if (!process.env.CESIUM_DIAGNOSTICS) {
     console.log("diagnostics not tested: CESIUM_DIAGNOSTICS is not set (no cesium1)");

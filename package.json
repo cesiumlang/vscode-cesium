@@ -1,5 +1,5 @@
 {
-  "name": "cesium",
+  "name": "vscode-cesium",
   "displayName": "%displayName%",
   "description": "%description%",
   "version": "0.0.0",

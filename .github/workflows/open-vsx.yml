@@ -40,7 +40,7 @@ defaults:
 
 jobs:
   publish:
-    name: Publish cesiumlang.cesium v${{ inputs.version }} to Open VSX
+    name: Publish cesiumlang.vscode-cesium v${{ inputs.version }} to Open VSX
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
