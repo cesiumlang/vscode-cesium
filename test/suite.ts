@@ -5,6 +5,7 @@
 // VSIX), the language server reports the error of error/unknown_name.csm.
 
 import * as assert from "node:assert/strict";
+import * as fs from "node:fs";
 import * as path from "node:path";
 import * as vscode from "vscode";
 
@@ -14,6 +15,12 @@ export async function run(): Promise<void> {
   await ext.activate();
   const want = process.env.CESIUM_VERSION;
   if (want) assert.equal(ext.packageJSON.version, want, "version of the packaged extension");
+  // the skill and the instructions for the AI assistants, in the installed extension
+  const contributes = ext.packageJSON.contributes;
+  for (const c of [...(contributes.chatSkills ?? []), ...(contributes.chatInstructions ?? [])]) {
+    assert.ok(fs.existsSync(path.join(ext.extensionPath, c.path)), `${c.path} is in the extension`);
+  }
+  assert.ok(contributes.chatSkills?.length && contributes.chatInstructions?.length, "a chat skill and chat instructions are contributed");
 
   const folder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   assert.ok(folder, "no workspace folder");
