@@ -7,6 +7,8 @@
 !bin/**
 !grammar/cesium.tmGrammar.json
 !grammar/LICENSE
+!agent-plugin/skills/**
+!instructions/**
 !icons/**
 !l10n/**
 !readme.md

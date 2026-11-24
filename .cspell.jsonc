@@ -8,6 +8,8 @@
     ".gitignore",
     ".local-gitignore",
     "node_modules/**",
+    // generated in cesiumlang/cesiumlang.org, fetched by tools/fetch-skill.sh
+    "agent-plugin/skills/cesium-language/**",
     "package-lock.json",
     "*.vsix",
     "dist/**",
