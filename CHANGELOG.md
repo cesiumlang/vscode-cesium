@@ -2,7 +2,7 @@
 
 ## 0.1.3 (unreleased)
 
-- `zcsls` reads the compilers' diagnostic codes (`error[E0304]: ...`, cesiumlang/cesium#82) and gives each as its diagnostic's code, shown in the Problems panel; without this, compilers that print codes had their errors dropped.
+- `zcsls` reads the compilers' diagnostic codes (`error[E0304]: ...`, cesiumlang/cesium#82) and gives each as its diagnostic's code, shown in the Problems panel with a link to its explanation on cesiumlang.org; without this, compilers that print codes had their errors dropped.
 
 ## 0.1.2
 

@@ -82,6 +82,7 @@ fn published(m: json.Value) []const json.Value {
 fn expectBad(d: json.Value) !void {
     try testing.expectEqualStrings("unknown name 'bad'", get(d, "message").string);
     try testing.expectEqualStrings("E9999", get(d, "code").string);
+    try testing.expectEqualStrings("https://cesiumlang.org/compiler/diagnostics/#e9999", get(get(d, "codeDescription"), "href").string);
     try testing.expectEqualStrings("cesium1", get(d, "source").string);
     const start = get(get(d, "range"), "start");
     try testing.expectEqual(1, get(start, "line").integer);

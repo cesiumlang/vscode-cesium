@@ -146,11 +146,21 @@ pub fn collect(a: Allocator, sources: []Source, texts: []const []const u8, start
             .range = .{ .start = .{ .line = at.line, .character = at.character }, .end = .{ .line = at.line, .character = at.end } },
             .severity = @backingInt(m.severity),
             .code = m.code,
+            .codeDescription = if (m.code) |c| try explanation(a, c) else null,
             .source = @tagName(kind),
             .message = m.text,
         });
     }
     return found;
+}
+
+/// The page that explains a compiler's code (`E0304`): the catalog of
+/// cesium-src/bootstrap/diagnostics.md on the website, where each code's
+/// heading is its anchor; null for a code of another form
+pub fn explanation(a: Allocator, code: []const u8) Allocator.Error!?lsp.CodeDescription {
+    if (code.len != 5 or code[0] != 'E') return null;
+    for (code[1..]) |c| if (!std.ascii.isDigit(c)) return null;
+    return .{ .href = try a.print("https://cesiumlang.org/compiler/diagnostics/#e{s}", .{code[1..]}) };
 }
 
 /// Where a message belongs: `cesium1`'s lines count through the joined
