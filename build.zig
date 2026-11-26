@@ -7,7 +7,13 @@
 //!   zig build package-vscode -- DIST  one VSIX per VS Code platform, each
 //!                                     with its zcsls in bin/, and the
 //!                                     universal VSIX without one
-//!                                     (build/package_vscode.zig)
+//!                                     (build/package_vscode.zig); with
+//!                                     the option zcsls-dir=DIR, the zcsls
+//!                                     staged in DIR instead of building
+//!                                     them
+//!   zig build stage-zcsls             zcsls for every platform's target in
+//!                                     zig-out/zcsls/TARGET/, for CI to sign
+//!                                     before packaging (#40)
 //!   zig build generated               the files generated from others
 //!   zig build check-generated         (build/generated.zig)
 
@@ -36,7 +42,25 @@ pub fn build(b: *std.Build) void {
     const test_step = b.step("test", "Run the unit tests of zcsls and of the build tools");
     test_step.dependOn(&b.addRunArtifact(b.addTest(.{ .root_module = zcsls.root_module })).step);
     test_step.dependOn(&b.addRunArtifact(addLspTest(b, target, optimize, zcsls)).step);
-    test_step.dependOn(&b.addRunArtifact(addPackageVscode(b)).step);
+
+    // one release build per target, which several platforms can share
+    var release: [platforms.len]*std.Build.Step.Compile = undefined;
+    const stage = b.step("stage-zcsls", "Install zcsls for every platform's target into zig-out/zcsls/TARGET/");
+    for (platforms, 0..) |p, i| {
+        const first = firstWithTarget(i);
+        if (first < i) {
+            release[i] = release[first];
+            continue;
+        }
+        const query = std.Target.Query.parse(.{ .arch_os_abi = p[1] }) catch unreachable;
+        release[i] = addZcsls(b, b.resolveTargetQuery(query), .ReleaseSafe, true);
+        stage.dependOn(&b.addInstallArtifact(release[i], .{
+            .dest_dir = .{ .override = .{ .custom = b.fmt("zcsls/{s}", .{p[1]}) } },
+            .pdb_dir = .disabled,
+            .implib_dir = .disabled,
+        }).step);
+    }
+    test_step.dependOn(&b.addRunArtifact(addPackageVscode(b, &release)).step);
     test_step.dependOn(&b.addRunArtifact(addGenerated(b)).step);
 }
 
@@ -75,13 +99,23 @@ fn addLspTest(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.bui
     return b.addTest(.{ .root_module = mod });
 }
 
+/// The index of the first platform whose zcsls has the target of platform `i`
+fn firstWithTarget(i: usize) usize {
+    for (platforms[0..i], 0..) |q, j| {
+        if (std.mem.eql(u8, q[1], platforms[i][1])) return j;
+    }
+    return i;
+}
+
 /// `zig build package-vscode -- DIST`:build/package_vscode.zig, run at the
 /// root of the repository as `package_vscode VERSION PLATFORM=ZCSLS... DIST`
-/// with zcsls built for each platform (none with `-Dplatforms=false`),
-/// safety checks on and debug information stripped.
+/// with each platform's zcsls from `release` (safety checks on, debug
+/// information stripped), or from the option `zcsls-dir` as `stage-zcsls`
+/// lays them out; none with `-Dplatforms=false`.
 /// Returns its unit tests.
-fn addPackageVscode(b: *std.Build) *std.Build.Step.Compile {
+fn addPackageVscode(b: *std.Build, release: []const *std.Build.Step.Compile) *std.Build.Step.Compile {
     const with_platforms = b.option(bool, "platforms", "package-vscode: the platform VSIX files with zcsls too (default: true)") orelse true;
+    const staged = b.option([]const u8, "zcsls-dir", "package-vscode: take each platform's zcsls from DIR/TARGET/, as stage-zcsls installs them, instead of building it");
     const mod = b.createModule(.{
         .root_source_file = b.path("build/package_vscode.zig"),
         .target = b.graph.host,
@@ -90,17 +124,13 @@ fn addPackageVscode(b: *std.Build) *std.Build.Step.Compile {
     run.setCwd(b.path(""));
     run.addArg(zon.version);
     if (with_platforms) {
-        // one build per target, which several platforms can share
-        var built: [platforms.len]?*std.Build.Step.Compile = @splat(null);
-        for (platforms, 0..) |p, i| {
-            const first = for (platforms[0..i], 0..) |q, j| {
-                if (std.mem.eql(u8, q[1], p[1])) break j;
-            } else i;
-            if (built[first] == null) {
-                const query = std.Target.Query.parse(.{ .arch_os_abi = p[1] }) catch unreachable;
-                built[first] = addZcsls(b, b.resolveTargetQuery(query), .ReleaseSafe, true);
+        for (platforms, release) |p, exe| {
+            if (staged) |dir| {
+                const name = if (std.mem.endsWith(u8, p[1], "-windows")) "zcsls.exe" else "zcsls";
+                run.addArg(b.fmt("{s}={s}/{s}/{s}", .{ p[0], dir, p[1], name }));
+            } else {
+                run.addPrefixedFileArg(b.fmt("{s}=", .{p[0]}), exe.getEmittedBin());
             }
-            run.addPrefixedFileArg(b.fmt("{s}=", .{p[0]}), built[first].?.getEmittedBin());
         }
     }
     run.addPassthruArgs();

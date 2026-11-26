@@ -12,3 +12,4 @@ vsix
 VSIX
 zcsls
 zfls
+Authenticode

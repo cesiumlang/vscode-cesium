@@ -8,11 +8,18 @@ name: CI
 # workflow by hand: `gh workflow run ci.yml --ref BRANCH`.
 #
 # - Build: type check, the unit tests of the extension (plain Node.js), of
-#   zcsls and of the Zig build tools, the generated files, and the VSIX
-#   files (`zig build package-vscode`): one per VS Code platform with zcsls
-#   built for it in bin/, and the universal one without a server, kept as
-#   the artifact `dist`. Zig is the devkit's (devkit-version), as in
-#   cesiumlang/cesium.
+#   zcsls and of the Zig build tools, the generated files, and zcsls built
+#   for every platform's target (`zig build stage-zcsls`), unsigned. Zig is
+#   the devkit's (devkit-version), as in cesiumlang/cesium.
+# - Sign: for a release, and a run started by hand with the `sign` input,
+#   the Windows zcsls.exe are signed with Azure Artifact Signing (#40), by
+#   the shared workflow of cesiumlang/.github; skipped while the SIGN_*
+#   variables are unset, so the binaries stay unsigned, and a failed signing
+#   fails the run. Signings are limited per month: never for a pull request.
+# - Package: the VSIX files (`zig build package-vscode`) from those zcsls,
+#   the signed ones in place of the unsigned: one per VS Code platform with
+#   its zcsls in bin/, and the universal one without a server, kept as the
+#   artifact `dist`.
 # - Test: the platform VSIX of each runner, unpacked as VS Code installs
 #   it, in a downloaded VS Code on Linux (under xvfb), macOS and Windows:
 #   the extension activates, and its zcsls reports the error of a fixture,
@@ -38,6 +45,11 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      sign:
+        description: Sign the Windows zcsls.exe, as a release does
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -58,6 +70,7 @@ jobs:
     outputs:
       version: ${{ steps.ver.outputs.version }}
       release: ${{ steps.ver.outputs.release }}
+      sign: ${{ steps.ver.outputs.sign }}
       sha: ${{ steps.ver.outputs.sha }}
     steps:
       - uses: actions/checkout@v7
@@ -72,6 +85,8 @@ jobs:
           EVENT: ${{ github.event_name }}
           REF: ${{ github.ref }}
           BASE_REF: ${{ github.base_ref }}
+          INPUT_SIGN: ${{ inputs.sign }}
+          SIGN_WINDOWS: ${{ vars.SIGN_AZURE_CLIENT_ID }}
         run: |
           version=$(sed -nE 's/^\s*\.version = "([^"]+)",/\1/p' build.zig.zon)
           if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
@@ -101,16 +116,27 @@ jobs:
               release=true
             fi
           fi
+          # signing: for a release, or a run started by hand that asks, once
+          # it is configured
+          sign=false
+          if [ "$release" = true ] || { [ "$EVENT" = workflow_dispatch ] && [ "$INPUT_SIGN" = true ]; }; then
+            if [ -n "$SIGN_WINDOWS" ]; then
+              sign=true
+            else
+              echo "::warning::signing is not configured (SIGN_AZURE_CLIENT_ID); zcsls.exe stays unsigned"
+            fi
+          fi
           sha=$(git rev-parse HEAD)
           {
             echo "version=$version"
             echo "release=$release"
+            echo "sign=$sign"
             echo "sha=$sha"
           } >> "$GITHUB_OUTPUT"
-          echo "version $version at $sha; release: $release" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "version $version at $sha; release: $release; sign: $sign" | tee -a "$GITHUB_STEP_SUMMARY"
 
   build:
-    name: Build and package
+    name: Build
     needs: version
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -135,23 +161,7 @@ jobs:
       - name: Unit tests
         run: npm run unit
 
-      # Only the devkit's Zig is unpacked; the archive is checked against the
-      # sha256 the release's devkits.json gives for it
-      - name: Fetch the devkit's Zig
-        run: |
-          version=$(tr -d '[:space:]' < devkit-version)
-          base="https://github.com/cesiumlang/devkits/releases/download/v$version"
-          host=x86_64-linux-musl
-          curl -fsSL --retry 5 -o "$RUNNER_TEMP/devkits.json" "$base/devkits.json"
-          url=$(jq -er --arg h "$host" '.devkits[$h].url' "$RUNNER_TEMP/devkits.json")
-          sha=$(jq -er --arg h "$host" '.devkits[$h].sha256' "$RUNNER_TEMP/devkits.json")
-          curl -fsSL --retry 5 -o "$RUNNER_TEMP/devkit.tar.xz" "$url"
-          echo "$sha  $RUNNER_TEMP/devkit.tar.xz" | sha256sum -c -
-          mkdir -p "$RUNNER_TEMP/devkit"
-          tar -xJf "$RUNNER_TEMP/devkit.tar.xz" -C "$RUNNER_TEMP/devkit" --strip-components=1 --wildcards '*/zig/*'
-          rm "$RUNNER_TEMP/devkit.tar.xz"
-          echo "$RUNNER_TEMP/devkit/zig" >> "$GITHUB_PATH"
-          "$RUNNER_TEMP/devkit/zig/zig" version
+      - uses: ./.github/actions/devkit-zig
 
       - name: Zig source is formatted (zig fmt)
         run: zig fmt --check build build.zig build.zig.zon server
@@ -163,8 +173,103 @@ jobs:
       - name: Generated files are up to date
         run: zig build check-generated
 
+      # zig-out/zcsls/TARGET/; a tar keeps the execute bits
+      - name: zcsls for every platform's target
+        run: |
+          zig build stage-zcsls --summary failures
+          tar -C zig-out/zcsls -cf zcsls.tar .
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: zcsls
+          path: zcsls.tar
+          if-no-files-found: error
+
+      # the executables to sign, as x86_64-windows/zcsls.exe and so on
+      - uses: actions/upload-artifact@v7
+        with:
+          name: zcsls-windows
+          path: |
+            zig-out/zcsls/x86_64-windows/
+            zig-out/zcsls/aarch64-windows/
+          if-no-files-found: error
+
+  sign-windows:
+    name: Sign zcsls.exe
+    needs: [version, build]
+    if: ${{ !cancelled() && needs.build.result == 'success' && needs.version.outputs.sign == 'true' }}
+    permissions:
+      contents: read
+      id-token: write
+    uses: cesiumlang/.github/.github/workflows/sign-windows.yml@main
+    with:
+      artifact: zcsls-windows
+      signed-artifact: zcsls-windows-signed
+      count: 2
+      run: x86_64-windows/zcsls.exe --version
+      client-id: ${{ vars.SIGN_AZURE_CLIENT_ID }}
+      tenant-id: ${{ vars.SIGN_AZURE_TENANT_ID }}
+      subscription-id: ${{ vars.SIGN_AZURE_SUBSCRIPTION_ID }}
+      endpoint: ${{ vars.SIGN_ENDPOINT }}
+      account: ${{ vars.SIGN_ACCOUNT }}
+      profile: ${{ vars.SIGN_PROFILE }}
+
+  package:
+    name: Package
+    needs: [version, build, sign-windows]
+    # unsigned when no signing was asked for; signed when it was
+    if: >-
+      ${{ !cancelled() && needs.build.result == 'success'
+      && (needs.sign-windows.result == 'success'
+      || (needs.version.outputs.sign != 'true' && needs.sign-windows.result == 'skipped')) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      SIGNED: ${{ needs.sign-windows.result == 'success' }}
+    steps:
+      # the grammar is a submodule
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.version.outputs.sha }}
+          submodules: recursive
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+
+      - uses: ./.github/actions/devkit-zig
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: zcsls
+          path: unsigned
+
+      - uses: actions/download-artifact@v8
+        if: env.SIGNED == 'true'
+        with:
+          name: zcsls-windows-signed
+          path: signed
+
+      - name: The zcsls to package
+        run: |
+          mkdir staged
+          tar -C staged -xf unsigned/zcsls.tar
+          if [ "$SIGNED" = true ]; then cp -R signed/. staged/; fi
+          find staged -type f | sort
+
       - name: Package the extension
-        run: zig build package-vscode -- dist
+        run: zig build package-vscode -Dzcsls-dir=staged -- dist
+
+      # a signing that succeeded must be what ships
+      - name: The Windows packages carry the signed zcsls.exe
+        if: env.SIGNED == 'true'
+        run: |
+          for p in win32-x64:x86_64-windows win32-arm64:aarch64-windows; do
+            unzip -p "dist/vscode-cesium-v$VERSION-${p%%:*}.vsix" extension/bin/zcsls.exe > "$RUNNER_TEMP/zcsls.exe"
+            cmp "$RUNNER_TEMP/zcsls.exe" "signed/${p#*:}/zcsls.exe"
+            echo "${p%%:*}: the signed zcsls.exe"
+          done
 
       - uses: actions/upload-artifact@v7
         with:
@@ -174,7 +279,7 @@ jobs:
 
   test:
     name: VS Code (${{ matrix.os }})
-    needs: [version, build]
+    needs: [version, package]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     strategy:
@@ -283,11 +388,21 @@ jobs:
             run_vscode
           fi
 
+      # what users install must be the signed program
+      - name: The packaged zcsls.exe is signed (Windows)
+        if: runner.os == 'Windows' && needs.version.outputs.sign == 'true'
+        shell: pwsh
+        run: |
+          $exe = "$env:RUNNER_TEMP\vsix\extension\bin\zcsls.exe"
+          $sig = Get-AuthenticodeSignature $exe
+          "${exe}: $($sig.Status) $($sig.SignerCertificate.Subject)"
+          if ($sig.Status -ne 'Valid') { throw "the packaged zcsls.exe is not validly signed: $($sig.Status)" }
+
   # The check the rulesets require: passes when no job before it failed or
   # was cancelled
   ci-result:
     name: CI
-    needs: [version, build, test]
+    needs: [version, build, sign-windows, package, test]
     if: ${{ always() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -305,10 +420,10 @@ jobs:
 
   release:
     name: Release v${{ needs.version.outputs.version }}
-    needs: [version, build, test]
+    needs: [version, package, test]
     if: >-
       ${{ !cancelled() && needs.version.outputs.release == 'true'
-      && needs.build.result == 'success' && needs.test.result == 'success' }}
+      && needs.package.result == 'success' && needs.test.result == 'success' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
