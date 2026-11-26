@@ -7,6 +7,7 @@ The Visual Studio Code extension for the [Cesium programming language](https://c
 - The language `cesium` for `.csm` source files and `.csi` module interface files.
 - Syntax highlighting with the TextMate grammar of [cesiumlang/grammar](https://github.com/cesiumlang/grammar).
 - Comments (`//` and `/* */`), bracket matching, auto-closing quotes and brackets, and indentation after an opening bracket.
+- Breakpoints in `.csm` files, for a native debugger (see [Debugging](#debugging)).
 
 The language server is `zcsls`, a stopgap server in Zig in this repository ([#7](https://github.com/cesiumlang/vscode-cesium/issues/7)), until the compiler's own `cesium lsp` takes its place ([cesiumlang/cesium#68](https://github.com/cesiumlang/cesium/issues/68)). So far it reports the errors of the bootstrap compilers (see [zcsls](#zcsls)). Outline, go to definition and the rest come later.
 
@@ -64,7 +65,7 @@ claude plugin marketplace add cesiumlang/vscode-cesium
 claude plugin install cesium@cesiumlang
 ```
 
-- **`zcsls` on the `PATH`.** The plugin does not carry the server: Claude Code starts `zcsls` from the `PATH` of the shell it runs in. `zcsls` comes only inside the platform packages of this extension, in their `bin/`; there are no separate downloads until `cesium lsp` replaces it. Put that directory on the `PATH` before starting Claude Code. It is in VS Code's extensions folder (`~/.vscode/extensions`, `%USERPROFILE%\.vscode\extensions` on Windows, `~/.vscode-insiders/extensions` for Insiders), in a folder named `cesiumlang.cesium-<version>-<platform>`, which changes with every update; these lines pick the newest one:
+- **`zcsls` on the `PATH`.** The plugin does not carry the server: Claude Code starts `zcsls` from the `PATH` of the shell it runs in. `zcsls` comes only inside the platform packages of this extension, in their `bin/`; there are no separate downloads until `cesium lsp` replaces it. Put that directory on the `PATH` before starting Claude Code. It is in VS Code's extensions folder (`~/.vscode/extensions`, `%USERPROFILE%\.vscode\extensions` on Windows, `~/.vscode-insiders/extensions` for Insiders), in a folder named `cesiumlang.vscode-cesium-<version>-<platform>`, which changes with every update; these lines pick the newest one:
 
   ```sh
   export PATH="$(ls -td ~/.vscode/extensions/cesiumlang.vscode-cesium-*/bin | head -n 1):$PATH"
@@ -80,11 +81,46 @@ claude plugin install cesium@cesiumlang
 - **Limits.** Language servers do not run in Claude Code's cloud sessions. In VS Code, Claude Code reads the Problems panel, where the extension's `zcsls` reports already; the plugin matters most for terminal and background agents.
 - **Copilot:** not yet. Copilot CLI reads the language servers of an Agent Plugins 1.0 plugin from `com.github.copilot/lsp.json`, whose contents its documentation does not define yet (checked 2026-11-20).
 - **Checks.** `claude plugin validate` does not read `.lsp.json`. `npm run unit` (`test/unit/plugin.test.ts`, in CI) checks that the plugin's JSON files parse, that the marketplace finds the plugin under its name, that `.lsp.json` starts `zcsls` for `.csm` and `.csi` as the language `cesium` of `package.json`, and that each skill has a name and a description.
-- The skill is the `cesium-language` skill of cesium-workspace with links in place of the workspace's paths. It gives way to the reference that cesiumlang/cesiumlang.org#25 generates, once there is one.
+- The skill is the one cesiumlang.org generates from the specification (cesiumlang/cesiumlang.org#25), taken by `tools/fetch-skill.sh`; `agent-plugin/skills/cesium-language/source.txt` says which build of the site it is.
+
+## Debugging
+
+The bootstrap compilers give their output line information (cesiumlang/cesium#78), so on Linux and macOS a native debugger stops at `.csm` lines, and breakpoints can be set in `.csm` files: this extension allows them for the language `cesium`, whichever debugger runs. There is no Cesium debug adapter yet ([#8](https://github.com/cesiumlang/vscode-cesium/issues/8)); use one of these in a `launch.json`, here for `cesium1` in a checkout of cesiumlang/cesium (`zig build` puts it in `zig-out/bin`):
+
+- **lldb-dap**, LLVM's extension (`llvm-vs-code-extensions.lldb-dap`), on macOS and Linux; on macOS its program comes with Xcode's command line tools (`xcrun --find lldb-dap`):
+
+  ```jsonc
+  {
+    "type": "lldb-dap",
+    "request": "launch",
+    "name": "cesium1",
+    "program": "${workspaceFolder}/zig-out/bin/cesium1",
+    "args": ["bootstrap/tests/s0/tokens.csm"],
+    "cwd": "${workspaceFolder}"
+  }
+  ```
+
+- **gdb**, through Microsoft's C/C++ extension (`ms-vscode.cpptools`), on Linux:
+
+  ```jsonc
+  {
+    "type": "cppdbg",
+    "request": "launch",
+    "name": "cesium1 (gdb)",
+    "program": "${workspaceFolder}/zig-out/bin/cesium1",
+    "args": ["bootstrap/tests/s0/tokens.csm"],
+    "cwd": "${workspaceFolder}",
+    "MIMode": "gdb"
+  }
+  ```
+
+- **`cwd`** is the folder the program was compiled from: the line tables name the files as the compiler was given them, relative to it. Breakpoints set by the editor's absolute paths resolve from there; cesiumlang/cesium's CI checks this with gdb and lldb.
+- **What works:** breakpoints, stepping and the call stack, by `.csm` line. Variables do not show: QBE, the backend of the bootstrap compilers, emits no variable or type information; the LLVM backend is to give that (cesiumlang/cesium#7).
+- **Windows:** not yet. The objects carry DWARF, which Windows debuggers do not read.
 
 ## Status
 
-The language is still being designed, and the extension follows the recorded decisions. Nothing is published to the Visual Studio Marketplace or to Open VSX yet ([#4](https://github.com/cesiumlang/vscode-cesium/issues/4); see [Publishing](#publishing)); to try it, build the VSIX as below and install it with **Extensions: Install from VSIX...**.
+The language is still being designed, and the extension follows the recorded decisions. Its pre-releases are published to the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=cesiumlang.vscode-cesium) and [Open VSX](https://open-vsx.org/extension/cesiumlang/vscode-cesium) as `cesiumlang.vscode-cesium` ([#4](https://github.com/cesiumlang/vscode-cesium/issues/4); see [Publishing](#publishing)); to try a build of `dev`, build the VSIX as below and install it with **Extensions: Install from VSIX...**.
 
 ## Development setup
 

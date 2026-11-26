@@ -72,6 +72,11 @@
         "path": "./grammar/cesium.tmGrammar.json"
       }
     ],
+    "breakpoints": [
+      {
+        "language": "cesium"
+      }
+    ],
     "chatSkills": [
       {
         "path": "./agent-plugin/skills/cesium-language/SKILL.md"
