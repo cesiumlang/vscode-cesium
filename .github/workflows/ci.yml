@@ -519,6 +519,11 @@ jobs:
                 next="$ma.$mi.$((pa + 1))"
               done
               sed -i -E "s/^(\s*\.version = \")[^\"]+(\",)/\1$next\2/" build.zig.zon
+              # the released section loses its "(unreleased)"; an empty one
+              # is begun for the next version, as skein's ci.yml does
+              printf '# Changelog\n\n## %s (unreleased)\n\n' "$next" > changelog.head
+              tail -n +3 CHANGELOG.md | sed "s/ (unreleased)$//" >> changelog.head
+              mv changelog.head CHANGELOG.md
               git commit -qam "Begin v$next development [skip ci]"
             fi
             if git push -q origin dev; then exit 0; fi
