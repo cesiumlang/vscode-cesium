@@ -10,6 +10,8 @@ pub const Diagnostic = struct {
     range: Range,
     /// 1 error, 2 warning
     severity: u8,
+    /// the compiler's diagnostic code (`E0101`), if it gave one
+    code: ?[]const u8 = null,
     /// the compiler that reported it
     source: []const u8,
     message: []const u8,
