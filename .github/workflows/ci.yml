@@ -280,6 +280,9 @@ jobs:
   test:
     name: VS Code (${{ matrix.os }})
     needs: [version, package]
+    # without this, a skipped sign-windows (every unsigned run) would skip
+    # the tests too, since a job is skipped when one before it was
+    if: ${{ !cancelled() && needs.package.result == 'success' }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     strategy:
@@ -415,6 +418,11 @@ jobs:
           bad=$(echo "$RESULTS" | jq -r '[to_entries[] | select(.value.result == "failure" or .value.result == "cancelled") | .key] | join(", ")')
           if [ -n "$bad" ]; then
             echo "::error::failed or cancelled: $bad"
+            exit 1
+          fi
+          # packages that were made must have been tested
+          if [ "$(echo "$RESULTS" | jq -r .package.result)" = success ] && [ "$(echo "$RESULTS" | jq -r .test.result)" != success ]; then
+            echo "::error::the packages were made but not tested"
             exit 1
           fi
 
