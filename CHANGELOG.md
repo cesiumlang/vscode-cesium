@@ -1,6 +1,8 @@
 # Changelog
 
-## 0.1.2 (unreleased)
+## 0.1.3 (unreleased)
+
+## 0.1.2
 
 - For the AI assistants in VS Code: the Cesium skill (`contributes.chatSkills`), the rules of the language with where each comes from and what is still open, generated from the specification on [cesiumlang.org](https://cesiumlang.org); and instructions for Cesium files (`contributes.chatInstructions`), to read the skill and check every change with the language server or a compiler. The agent plugin ships the same skill.
 - The `zcsls.exe` in the Windows packages is signed (Authenticode, through Azure Artifact Signing).
