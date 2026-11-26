@@ -85,7 +85,7 @@ claude plugin install cesium@cesiumlang
 
 ## Debugging
 
-The bootstrap compilers give their output line information (cesiumlang/cesium#78), so on Linux and macOS a native debugger stops at `.csm` lines, and breakpoints can be set in `.csm` files: this extension allows them for the language `cesium`, whichever debugger runs. There is no Cesium debug adapter yet ([#8](https://github.com/cesiumlang/vscode-cesium/issues/8)); use one of these in a `launch.json`, here for `cesium1` in a checkout of cesiumlang/cesium (`zig build` puts it in `zig-out/bin`):
+The bootstrap compilers give their output line information (cesiumlang/cesium#78: DWARF on Linux and macOS, CodeView in a PDB on Windows), so a native debugger stops at `.csm` lines, and breakpoints can be set in `.csm` files: this extension allows them for the language `cesium`, whichever debugger runs. There is no Cesium debug adapter yet ([#8](https://github.com/cesiumlang/vscode-cesium/issues/8)); use one of these in a `launch.json`, here for `cesium1` in a checkout of cesiumlang/cesium (`zig build` puts it in `zig-out/bin`):
 
 - **lldb-dap**, LLVM's extension (`llvm-vs-code-extensions.lldb-dap`), on macOS and Linux; on macOS its program comes with Xcode's command line tools (`xcrun --find lldb-dap`):
 
@@ -114,9 +114,21 @@ The bootstrap compilers give their output line information (cesiumlang/cesium#78
   }
   ```
 
-- **`cwd`** is the folder the program was compiled from: the line tables name the files as the compiler was given them, relative to it. Breakpoints set by the editor's absolute paths resolve from there; cesiumlang/cesium's CI checks this with gdb and lldb.
+- **The Visual Studio debugger**, through the same C/C++ extension, on Windows:
+
+  ```jsonc
+  {
+    "type": "cppvsdbg",
+    "request": "launch",
+    "name": "cesium1 (Windows)",
+    "program": "${workspaceFolder}/zig-out/bin/cesium1.exe",
+    "args": ["bootstrap/tests/s0/tokens.csm"],
+    "cwd": "${workspaceFolder}"
+  }
+  ```
+
+- **`cwd`** is the folder the program was compiled from, on Linux and macOS: the DWARF line tables name the files as the compiler was given them, relative to it. Breakpoints set by the editor's absolute paths resolve from there; cesiumlang/cesium's CI checks this with gdb and lldb. On Windows the PDB names absolute paths, so `cwd` does not matter for breakpoints; CI checks them with `cdb`, the console form of WinDbg, which reads the PDB as the Visual Studio debugger does ([#47](https://github.com/cesiumlang/vscode-cesium/issues/47)).
 - **What works:** breakpoints, stepping and the call stack, by `.csm` line. Variables do not show: QBE, the backend of the bootstrap compilers, emits no variable or type information; the LLVM backend is to give that (cesiumlang/cesium#7).
-- **Windows:** not yet. The objects carry DWARF, which Windows debuggers do not read.
 
 ## Status
 
