@@ -24,3 +24,5 @@ cppvsdbg
 WinDbg
 CodeView
 cdb
+libcsmir
+fdebug
