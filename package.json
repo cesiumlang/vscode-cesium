@@ -72,6 +72,17 @@
         "path": "./grammar/cesium.tmGrammar.json"
       }
     ],
+    "chatSkills": [
+      {
+        "path": "./agent-plugin/skills/cesium-language/SKILL.md"
+      }
+    ],
+    "chatInstructions": [
+      {
+        "path": "./instructions/cesium.instructions.md",
+        "when": "resourceLangId == cesium"
+      }
+    ],
     "commands": [
       {
         "command": "cesium.restartServer",
