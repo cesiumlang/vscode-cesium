@@ -2,7 +2,7 @@
 
 ## 0.1.3 (unreleased)
 
-- Breakpoints can be set in `.csm` files, for a native debugger: the bootstrap compilers' output now has line information (cesiumlang/cesium#78), and the readme's "Debugging" gives launch configurations for lldb-dap and gdb, and for the Visual Studio debugger on Windows, where the compilers now write CodeView line tables (#47).
+- Breakpoints can be set in `.csm` files, for a native debugger: the bootstrap compilers' output now has line information (cesiumlang/cesium#78), and the readme's "Debugging" gives launch configurations for lldb-dap and gdb, and for the Visual Studio debugger on Windows, where the compilers now write CodeView line tables (#47). In a debug build, the compilers' default, the debugger also shows locals and parameters with their types, in their lexical scopes (cesiumlang/cesium#143).
 
 - `zcsls` reads the compilers' diagnostic codes (`error[E0304]: ...`, cesiumlang/cesium#82) and gives each as its diagnostic's code, shown in the Problems panel with a link to its explanation on cesiumlang.org; without this, compilers that print codes had their errors dropped.
 
