@@ -34,6 +34,7 @@ The extension starts the language server when a Cesium file is opened, as a thin
 - **Where errors go.** `cesium1` counts lines from the start of its input, the unit's files one after another (each ending in a line break); `zcsls` maps each line back to its file and line. `cesium0` names the file. Columns are converted to UTF-16, as LSP counts them. A message without a place (the verifier's, a limit of `cesium1`) goes on the first line of the document checked.
 - **Limits.** `cesium1` stops at the first error, so a unit shows one error at a time; `cesium0` reports every error it finds, but knows only S0. An error at the end of one file can be reported at the start of the next one, as the compiler sees them joined. A check runs while the server waits, so a slow compiler delays the answers that follow (it is stopped after 30 seconds).
 - `zcsls --version` prints its version, which is the extension's (`build.zig.zon`).
+- From 0.1.2 on, the `zcsls.exe` of the Windows packages is signed (Authenticode); a build of your own is not.
 
 ## Other editors
 

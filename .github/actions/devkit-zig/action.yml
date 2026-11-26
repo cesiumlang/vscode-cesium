@@ -1,0 +1,25 @@
+name: The devkit's Zig
+description: >-
+  Puts the Zig of the devkit that devkit-version names on the PATH (Linux
+  x86_64). Only Zig is unpacked; the archive is checked against the sha256
+  the release's devkits.json gives for it.
+
+runs:
+  using: composite
+  steps:
+    - name: Fetch the devkit's Zig
+      shell: bash
+      run: |
+        version=$(tr -d '[:space:]' < devkit-version)
+        base="https://github.com/cesiumlang/devkits/releases/download/v$version"
+        host=x86_64-linux-musl
+        curl -fsSL --retry 5 -o "$RUNNER_TEMP/devkits.json" "$base/devkits.json"
+        url=$(jq -er --arg h "$host" '.devkits[$h].url' "$RUNNER_TEMP/devkits.json")
+        sha=$(jq -er --arg h "$host" '.devkits[$h].sha256' "$RUNNER_TEMP/devkits.json")
+        curl -fsSL --retry 5 -o "$RUNNER_TEMP/devkit.tar.xz" "$url"
+        echo "$sha  $RUNNER_TEMP/devkit.tar.xz" | sha256sum -c -
+        mkdir -p "$RUNNER_TEMP/devkit"
+        tar -xJf "$RUNNER_TEMP/devkit.tar.xz" -C "$RUNNER_TEMP/devkit" --strip-components=1 --wildcards '*/zig/*'
+        rm "$RUNNER_TEMP/devkit.tar.xz"
+        echo "$RUNNER_TEMP/devkit/zig" >> "$GITHUB_PATH"
+        "$RUNNER_TEMP/devkit/zig/zig" version
