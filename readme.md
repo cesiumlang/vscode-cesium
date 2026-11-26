@@ -128,7 +128,7 @@ The bootstrap compilers give their output line information (cesiumlang/cesium#78
   ```
 
 - **`cwd`** is the folder the program was compiled from, on Linux and macOS: the DWARF line tables name the files as the compiler was given them, relative to it. Breakpoints set by the editor's absolute paths resolve from there; cesiumlang/cesium's CI checks this with gdb and lldb. On Windows the PDB names absolute paths, so `cwd` does not matter for breakpoints; CI checks them with `cdb`, the console form of WinDbg, which reads the PDB as the Visual Studio debugger does ([#47](https://github.com/cesiumlang/vscode-cesium/issues/47)).
-- **What works:** breakpoints, stepping and the call stack, by `.csm` line. Variables do not show: QBE, the backend of the bootstrap compilers, emits no variable or type information; the LLVM backend is to give that (cesiumlang/cesium#7).
+- **What works:** breakpoints, stepping and the call stack, by `.csm` line, and in a debug build (the compilers' default, `-O debug`) the locals and parameters with their types and lexical scopes, struct fields and array elements, on all three debuggers (cesiumlang/cesium#143). QBE, the backend of the bootstrap compilers, writes no variable information, so a debug build keeps each local in memory and `libcsmir` describes it; the other build modes (`-O safe`, `fast`, `small`) do so only with `-fdebug-variables`.
 
 ## Status
 
