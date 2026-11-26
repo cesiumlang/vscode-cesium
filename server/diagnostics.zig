@@ -145,6 +145,7 @@ pub fn collect(a: Allocator, sources: []Source, texts: []const []const u8, start
         try sources[at.file].diagnostics.append(a, .{
             .range = .{ .start = .{ .line = at.line, .character = at.character }, .end = .{ .line = at.line, .character = at.end } },
             .severity = @backingInt(m.severity),
+            .code = m.code,
             .source = @tagName(kind),
             .message = m.text,
         });

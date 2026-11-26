@@ -81,6 +81,7 @@ fn published(m: json.Value) []const json.Value {
 /// Checks that `d` is cesium1's error at `bad` in b.csm
 fn expectBad(d: json.Value) !void {
     try testing.expectEqualStrings("unknown name 'bad'", get(d, "message").string);
+    try testing.expectEqualStrings("E9999", get(d, "code").string);
     try testing.expectEqualStrings("cesium1", get(d, "source").string);
     const start = get(get(d, "range"), "start");
     try testing.expectEqual(1, get(start, "line").integer);
