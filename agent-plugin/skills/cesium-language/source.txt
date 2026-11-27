@@ -1,1 +1,1 @@
-Fetched from https://cesiumlang.org/skill/cesium-language/ on 2026-11-24 by tools/fetch-skill.sh: regenerated, never edited.
+Fetched from https://cesiumlang.org/skill/cesium-language/ on 2026-11-27 by tools/fetch-skill.sh: regenerated, never edited.
