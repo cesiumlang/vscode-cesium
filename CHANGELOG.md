@@ -12,6 +12,8 @@
 
 - Doc comments highlight Javadoc tags (`@param`) only; Doxygen backslash tags (`\param`) are not Cesium's (cesiumlang/grammar#4).
 
+- The operators of the specification are highlighted as operators: the address comparisons `#==` and `#!=`, bitwise NOT `!.`, the elementwise product `.*`, and the conditional `? :` (cesiumlang/grammar#21).
+
 ## 0.1.2
 
 - For the AI assistants in VS Code: the Cesium skill (`contributes.chatSkills`), the rules of the language with where each comes from and what is still open, generated from the specification on [cesiumlang.org](https://cesiumlang.org); and instructions for Cesium files (`contributes.chatInstructions`), to read the skill and check every change with the language server or a compiler. The agent plugin ships the same skill.
