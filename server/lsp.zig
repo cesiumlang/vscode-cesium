@@ -6,10 +6,16 @@ pub const Position = struct { line: usize, character: usize };
 
 pub const Range = struct { start: Position, end: Position };
 
+pub const CodeDescription = struct { href: []const u8 };
+
 pub const Diagnostic = struct {
     range: Range,
     /// 1 error, 2 warning
     severity: u8,
+    /// the compiler's diagnostic code (`E0101`), if it gave one
+    code: ?[]const u8 = null,
+    /// where the code is explained
+    codeDescription: ?CodeDescription = null,
     /// the compiler that reported it
     source: []const u8,
     message: []const u8,

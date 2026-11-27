@@ -33,10 +33,12 @@ name: CI
 # main whose version is not tagged yet, once built and tested, is tagged and
 # published as a GitHub pre-release with the VSIX; the publishing workflows
 # (open-vsx.yml, marketplace.yml) are then started, and main is merged back
-# into dev, where build.zig.zon gets the next patch version. While the
+# into dev, where build.zig.zon gets the next patch version (version.sh,
+# which also checks every place that states it on every run). While the
 # server is zcsls every version is a pre-release, 0.<odd>.<patch> (#3); for
-# a new minor version, set it in build.zig.zon on dev by hand. A push to main
-# whose version is already tagged is tested but not released.
+# a new minor version, run `bash .github/workflows/version.sh set X.Y.Z` on
+# dev. A push to main whose version is already tagged is tested but not
+# released.
 
 on:
   push:
@@ -88,9 +90,9 @@ jobs:
           INPUT_SIGN: ${{ inputs.sign }}
           SIGN_WINDOWS: ${{ vars.SIGN_AZURE_CLIENT_ID }}
         run: |
-          version=$(sed -nE 's/^\s*\.version = "([^"]+)",/\1/p' build.zig.zon)
-          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error file=build.zig.zon::cannot read a MAJOR.MINOR.PATCH .version (got '$version')"
+          # every place that states the version agrees (version.sh lists them)
+          if ! version=$(bash .github/workflows/version.sh); then
+            echo "::error file=build.zig.zon::the places that state the version disagree; see the log, and set them all with version.sh set"
             exit 1
           fi
           tagged() { git rev-parse -q --verify "refs/tags/v$1" >/dev/null; }
@@ -518,7 +520,9 @@ jobs:
                 IFS=. read -r ma mi pa <<< "$next"
                 next="$ma.$mi.$((pa + 1))"
               done
-              sed -i -E "s/^(\s*\.version = \")[^\"]+(\",)/\1$next\2/" build.zig.zon
+              # every place that states the version; the released changelog
+              # section loses its "(unreleased)" and an empty one is begun
+              bash .github/workflows/version.sh set "$next"
               git commit -qam "Begin v$next development [skip ci]"
             fi
             if git push -q origin dev; then exit 0; fi

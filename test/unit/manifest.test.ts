@@ -27,6 +27,10 @@ test("the chat skill and instructions exist, and the instructions are for Cesium
   for (const i of pkg.contributes.chatInstructions) assert.equal(i.when, "resourceLangId == cesium");
 });
 
+test("breakpoints can be set in Cesium files, for any debugger", () => {
+  assert.deepEqual(pkg.contributes.breakpoints, [{ language: "cesium" }]);
+});
+
 test("the grammar has the scope package.json gives it", () => {
   for (const g of pkg.contributes.grammars) {
     const grammar = JSON.parse(fs.readFileSync(path.join(root, g.path), "utf8"));

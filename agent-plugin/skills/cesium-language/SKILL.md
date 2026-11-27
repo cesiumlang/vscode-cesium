@@ -60,7 +60,7 @@ Only the S0 subset compiles today: `references/spec/s0.md`, whose last section s
 ### The S0 subset (`references/spec/s0.md`)
 
 - `s0.subset` (static, draft): S0 is a strict subset of Cesium: every S0 program is a Cesium program with the same meaning, and every later compiler compiles the frozen stage 1. Decided in cesium#9, rule 1. See conf.subset.
-- `s0.purpose` (static, draft): A feature is added to S0 only when stage 1 needs it and implementing it in stage 0 is cheaper than writing around it; a feature that needs more than a near one-to-one mapping onto core MIR belongs in S1. Decided in cesium#9, rules 2 and 3.
+- `s0.purpose` (static, draft): A feature is added to S0 only when stage 1 needs it and implementing it in stage 0 is cheaper than writing around it; a feature that needs more than a near one-to-one mapping onto core SIR belongs in S1. Decided in cesium#9, rules 2 and 3.
 - `s0.tokens` (syntax, draft): S0 uses the lexical structure of the lexical chapter, with these literals only. Decided in cesium#9 ("Literals": integers, characters, strings):
 - `s0.entry` (static, draft): The entry function is the hosted `main`: `i32 = main(i32 argc, ##u8 argv)`. Decided in cesium#9.
 - `s0.type.integers` (static, draft): The integer types of S0 are `u8`, `i32`, `u32`, `i64`, `u64` and `uword`. `i32` and `u32` are there for the C ABI: an `i64` passed where C expects an `int` works on x86-64 and breaks on 32-bit targets. Decided in cesium#9.
@@ -73,14 +73,14 @@ Only the S0 subset compiles today: `references/spec/s0.md`, whose last section s
 - `s0.statement.loops` (static, draft): `break` and `continue` apply to the innermost `while`. Decided in cesium#8.
 - `s0.assign.pointer` (static, draft): Plain `=` on a pointer assigns through it; it never initializes a pointer or makes it point elsewhere. A pointer gets its address with `:=` or `#=`: `#Token t := alloc(1);`, `t.start #= "hello";`. Decided in cesium#9 (amendment of 2026-11-16) and cesium#11, rules 2 and 5.
 - `s0.expr.deref` (static, draft): There is no dereference operator: a pointer is read through by default, and `p[i]` and `p.f` reach through a pointer. Decided in cesium#9 (amendment of 2026-11-16) and cesium#11, rules 5 and 29.
-- `s0.expr.arithmetic` (dynamic, draft): The arithmetic operators have core MIR's defined meaning: integers wrap, and shifts and division by zero have defined results. Decided in cesium#9 and cesium#8.
+- `s0.expr.arithmetic` (dynamic, draft): The arithmetic operators have core SIR's defined meaning: integers wrap, and shifts and division by zero have defined results. Decided in cesium#9 and cesium#8.
 - `s0.expr.short-circuit` (dynamic, draft): `&&` and `||` evaluate their right operand only when the left one does not decide the result. Decided in cesium#9 (mapping to `land` and `lor`).
 - `s0.expr.string` (static, draft): In S0 a string literal is used as a `#u8` to its first byte, NUL-terminated. Decided in cesium#9; see lex.lit.string.type.
 - `s0.expr.sizeof` (static, draft): `sizeof(T)` is the size of `T` in bytes, as a `uword`. Decided in cesium#9.
 - `s0.expr.alloc` (static, draft): `alloc(count)` allocates `count` elements from an arena that is never freed; the element type is the one of the pointer it initializes. Decided in cesium#9 ("Memory").
 - `s0.check.address-context` (legality, draft): `:=` and `#=` are used only with a pointer on the left; `=` initializes only a plain value, or assigns through a pointer. Decided in cesium#11, rules 4 and 5.
 - `s0.check.pointer-argument` (legality, draft): A pointer is passed to a pointer parameter as it is; a plain value passed to a pointer parameter has its address taken with `#`. Decided in cesium#11, rule 20.
-- `s0.mir` (dynamic, draft): Each S0 construct means what its core MIR form means. Decided in cesium#9:
+- `s0.sir` (dynamic, draft): Each S0 construct means what its core SIR form means. Decided in cesium#9:
 - `s0.excluded` (legality, draft): Everything not given above is not S0, among it: `for`, ranges, `switch` and `case`, `enum`, unions and `typeof`, `slice`, `list`, `dict` and `str`, multiple return values, `defer`, `error` types, `catch` and `throw`, floating point, `free` and `realloc`, methods and `this`, generics, traits, inheritance, operator overloading, the math operators (`^`, `::`, `@`, the `*` that depends on its operands, postfix `~`), SIMD, `comptime`, string interpolation, `with`, inline `asm`, `volatile` and `atomic`. Decided in cesium#9; modules and `import` of Cesium code left the list by the direction of 2026-11-22 (s0.import).
 
 ## Direction: not yet decided
@@ -184,7 +184,7 @@ Only the S0 subset compiles today: `references/spec/s0.md`, whose last section s
 - Open: whether a `const` global may be an array or a pointer, and which expressions may initialize a global (cesium#9).
 - Open (cesium#27): whether S0 limits definitions to the top level, as the grammar above and stage 0 do; how far the parser looks ahead when the first name is a type the program defines.
 - Open: `~=` in S0 (cesium#74); a block as a statement by itself, which S0 does not list; how a pointer in a condition means non-null under dereference by default (cesium#38); compound assignment and `++`/`--` (cesium#15) in S0.
-- Open: unary minus, which S0 source writes as `0 - x` (cesium#15); prefix `~x` (cesium#74); `null`, and `#==` and `#!=` in S0 (cesium#26, cesium#43); `!.` and `true`/`false` in S0; the result type of a comparison, `u8` in core MIR (cesium#38); `T(x)` told apart from a call (cesium#34, cesium#18).
+- Open: unary minus, which S0 source writes as `0 - x` (cesium#15); prefix `~x` (cesium#74); `null`, and `#==` and `#!=` in S0 (cesium#26, cesium#43); `!.` and `true`/`false` in S0; the result type of a comparison, `u8` in core SIR (cesium#38); `T(x)` told apart from a call (cesium#34, cesium#18).
 - Open (cesium#74): s0.subset means that S0 source also satisfies the ownership rules stage 0 does not check, such as every owner released on every path (cesium#11, rule 9) and writes only through `~T` (cesium#11, rule 1). S0 has no `free`, and the sample program of cesium#9 writes through `#T`.
 
 ## Examples that compile
@@ -198,8 +198,8 @@ In [cesiumlang/cesium](https://github.com/cesiumlang/cesium):
 ## Checking code
 
 - Build the compilers from a clone of cesiumlang/cesium: `bash tools/fetch-devkit.sh`, then `.devkit/zig/zig build` installs `cesium0` and `cesium1` to `zig-out/bin`.
-- `cesium0 --emit-mir -o out.mir a.csm b.csm` checks S0 and reports every error as `file:line:col: error: message`.
-- `cat a.csm b.csm | cesium1` checks the same unit and stops at the first error; its line numbers count from the start of the joined input.
+- `cesium0 --emit-sir -o out.sir a.csm b.csm` checks S0 and reports every error as `file:line:col: error[E0304]: message`; the code is explained in `bootstrap/diagnostics.md`.
+- `cesium1 a.csm b.csm` checks the same unit and stops at the first error, naming its file; given the files joined on standard input instead (`cat a.csm b.csm | cesium1`, as editors do), its line numbers count from the start of the input.
 - In an editor with the Cesium extension or agent plugin, the language server `zcsls` reports the same errors as diagnostics.
 - A Cesium change is not done until a compiler accepts it, or rejects it with the expected message for an error test.
 

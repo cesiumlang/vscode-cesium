@@ -1,6 +1,7 @@
 //! A stand-in for `cesium1` in the LSP test (lsp_test.zig): it reads the
 //! unit on standard input and reports the first `bad` in it as `cesium1`
-//! does, `line:col: error: message` with lines counted through its input.
+//! does, `line:col: error[CODE]: message` with lines counted through its
+//! input (the code is made up).
 
 const std = @import("std");
 const Io = std.Io;
@@ -15,7 +16,7 @@ pub fn main(init: std.process.Init) !u8 {
     const col = at - (if (std.mem.findScalarLast(u8, input[0..at], '\n')) |nl| nl + 1 else 0) + 1;
     var out_buf: [256]u8 = undefined;
     var w = Io.File.stdout().writerStreaming(io, &out_buf);
-    try w.interface.print("{d}:{d}: error: unknown name 'bad'\n", .{ line, col });
+    try w.interface.print("{d}:{d}: error[E9999]: unknown name 'bad'\n", .{ line, col });
     try w.interface.flush();
     return 1;
 }

@@ -7,6 +7,7 @@ The Visual Studio Code extension for the [Cesium programming language](https://c
 - The language `cesium` for `.csm` source files and `.csi` module interface files.
 - Syntax highlighting with the TextMate grammar of [cesiumlang/grammar](https://github.com/cesiumlang/grammar).
 - Comments (`//` and `/* */`), bracket matching, auto-closing quotes and brackets, and indentation after an opening bracket.
+- Breakpoints in `.csm` files, for a native debugger (see [Debugging](#debugging)).
 
 The language server is `zcsls`, a stopgap server in Zig in this repository ([#7](https://github.com/cesiumlang/vscode-cesium/issues/7)), until the compiler's own `cesium lsp` takes its place ([cesiumlang/cesium#68](https://github.com/cesiumlang/cesium/issues/68)). So far it reports the errors of the bootstrap compilers (see [zcsls](#zcsls)). Outline, go to definition and the rest come later.
 
@@ -32,6 +33,7 @@ The extension starts the language server when a Cesium file is opened, as a thin
 - **Files changed on disk.** Where the client allows it (`workspace.didChangeWatchedFiles.dynamicRegistration`), `zcsls` asks it at `initialized` to watch `**/*.{csm,csi}`. A file created, changed or deleted outside the editor checks the units of the open documents it belongs to again (or asks for a pull); a deleted file's diagnostics are cleared. An open document is left alone, its text being the editor's.
 - **What the compilers read.** `cesium1` reads the unit on standard input, so it is given the text of the open documents, unsaved edits included; `cesium0` reads files, so it sees what is saved, and only a save changes what it finds. A document that is not a local file (an untitled one) is a unit of its own, checked by `cesium1` only.
 - **Where errors go.** `cesium1` counts lines from the start of its input, the unit's files one after another (each ending in a line break); `zcsls` maps each line back to its file and line. `cesium0` names the file. Columns are converted to UTF-16, as LSP counts them. A message without a place (the verifier's, a limit of `cesium1`) goes on the first line of the document checked.
+- **Codes.** The compilers name each error with a code, `error[E0304]: unknown name 'x'` (their catalog: [`bootstrap/diagnostics.md`](https://github.com/cesiumlang/cesium/blob/dev/bootstrap/diagnostics.md) of cesiumlang/cesium); the code becomes the diagnostic's LSP `code`, shown beside the message, and links to its explanation on [cesiumlang.org](https://cesiumlang.org/compiler/diagnostics/) (`codeDescription`).
 - **Limits.** `cesium1` stops at the first error, so a unit shows one error at a time; `cesium0` reports every error it finds, but knows only S0. An error at the end of one file can be reported at the start of the next one, as the compiler sees them joined. A check runs while the server waits, so a slow compiler delays the answers that follow (it is stopped after 30 seconds).
 - `zcsls --version` prints its version, which is the extension's (`build.zig.zon`).
 - From 0.1.2 on, the `zcsls.exe` of the Windows packages is signed (Authenticode); a build of your own is not.
@@ -63,7 +65,7 @@ claude plugin marketplace add cesiumlang/vscode-cesium
 claude plugin install cesium@cesiumlang
 ```
 
-- **`zcsls` on the `PATH`.** The plugin does not carry the server: Claude Code starts `zcsls` from the `PATH` of the shell it runs in. `zcsls` comes only inside the platform packages of this extension, in their `bin/`; there are no separate downloads until `cesium lsp` replaces it. Put that directory on the `PATH` before starting Claude Code. It is in VS Code's extensions folder (`~/.vscode/extensions`, `%USERPROFILE%\.vscode\extensions` on Windows, `~/.vscode-insiders/extensions` for Insiders), in a folder named `cesiumlang.cesium-<version>-<platform>`, which changes with every update; these lines pick the newest one:
+- **`zcsls` on the `PATH`.** The plugin does not carry the server: Claude Code starts `zcsls` from the `PATH` of the shell it runs in. `zcsls` comes only inside the platform packages of this extension, in their `bin/`; there are no separate downloads until `cesium lsp` replaces it. Put that directory on the `PATH` before starting Claude Code. It is in VS Code's extensions folder (`~/.vscode/extensions`, `%USERPROFILE%\.vscode\extensions` on Windows, `~/.vscode-insiders/extensions` for Insiders), in a folder named `cesiumlang.vscode-cesium-<version>-<platform>`, which changes with every update; these lines pick the newest one:
 
   ```sh
   export PATH="$(ls -td ~/.vscode/extensions/cesiumlang.vscode-cesium-*/bin | head -n 1):$PATH"
@@ -79,11 +81,58 @@ claude plugin install cesium@cesiumlang
 - **Limits.** Language servers do not run in Claude Code's cloud sessions. In VS Code, Claude Code reads the Problems panel, where the extension's `zcsls` reports already; the plugin matters most for terminal and background agents.
 - **Copilot:** not yet. Copilot CLI reads the language servers of an Agent Plugins 1.0 plugin from `com.github.copilot/lsp.json`, whose contents its documentation does not define yet (checked 2026-11-20).
 - **Checks.** `claude plugin validate` does not read `.lsp.json`. `npm run unit` (`test/unit/plugin.test.ts`, in CI) checks that the plugin's JSON files parse, that the marketplace finds the plugin under its name, that `.lsp.json` starts `zcsls` for `.csm` and `.csi` as the language `cesium` of `package.json`, and that each skill has a name and a description.
-- The skill is the `cesium-language` skill of cesium-workspace with links in place of the workspace's paths. It gives way to the reference that cesiumlang/cesiumlang.org#25 generates, once there is one.
+- The skill is the one cesiumlang.org generates from the specification (cesiumlang/cesiumlang.org#25), taken by `tools/fetch-skill.sh`; `agent-plugin/skills/cesium-language/source.txt` says which build of the site it is.
+
+## Debugging
+
+The bootstrap compilers give their output line information (cesiumlang/cesium#78: DWARF on Linux and macOS, CodeView in a PDB on Windows), so a native debugger stops at `.csm` lines, and breakpoints can be set in `.csm` files: this extension allows them for the language `cesium`, whichever debugger runs. There is no Cesium debug adapter yet ([#8](https://github.com/cesiumlang/vscode-cesium/issues/8)); use one of these in a `launch.json`, here for `cesium1` in a checkout of cesiumlang/cesium (`zig build` puts it in `zig-out/bin`):
+
+- **lldb-dap**, LLVM's extension (`llvm-vs-code-extensions.lldb-dap`), on macOS and Linux; on macOS its program comes with Xcode's command line tools (`xcrun --find lldb-dap`):
+
+  ```jsonc
+  {
+    "type": "lldb-dap",
+    "request": "launch",
+    "name": "cesium1",
+    "program": "${workspaceFolder}/zig-out/bin/cesium1",
+    "args": ["bootstrap/tests/s0/tokens.csm"],
+    "cwd": "${workspaceFolder}"
+  }
+  ```
+
+- **gdb**, through Microsoft's C/C++ extension (`ms-vscode.cpptools`), on Linux:
+
+  ```jsonc
+  {
+    "type": "cppdbg",
+    "request": "launch",
+    "name": "cesium1 (gdb)",
+    "program": "${workspaceFolder}/zig-out/bin/cesium1",
+    "args": ["bootstrap/tests/s0/tokens.csm"],
+    "cwd": "${workspaceFolder}",
+    "MIMode": "gdb"
+  }
+  ```
+
+- **The Visual Studio debugger**, through the same C/C++ extension, on Windows:
+
+  ```jsonc
+  {
+    "type": "cppvsdbg",
+    "request": "launch",
+    "name": "cesium1 (Windows)",
+    "program": "${workspaceFolder}/zig-out/bin/cesium1.exe",
+    "args": ["bootstrap/tests/s0/tokens.csm"],
+    "cwd": "${workspaceFolder}"
+  }
+  ```
+
+- **`cwd`** is the folder the program was compiled from, on Linux and macOS: the DWARF line tables name the files as the compiler was given them, relative to it. Breakpoints set by the editor's absolute paths resolve from there; cesiumlang/cesium's CI checks this with gdb and lldb. On Windows the PDB names absolute paths, so `cwd` does not matter for breakpoints; CI checks them with `cdb`, the console form of WinDbg, which reads the PDB as the Visual Studio debugger does ([#47](https://github.com/cesiumlang/vscode-cesium/issues/47)).
+- **What works:** breakpoints, stepping and the call stack, by `.csm` line, and in a debug build (the compilers' default, `-O debug`) the locals and parameters with their types and lexical scopes, struct fields and array elements, on all three debuggers (cesiumlang/cesium#143). QBE, the backend of the bootstrap compilers, writes no variable information, so a debug build keeps each local in memory and `libcsir` describes it; the other build modes (`-O safe`, `fast`, `small`) do so only with `-fdebug-variables`.
 
 ## Status
 
-The language is still being designed, and the extension follows the recorded decisions. Nothing is published to the Visual Studio Marketplace or to Open VSX yet ([#4](https://github.com/cesiumlang/vscode-cesium/issues/4); see [Publishing](#publishing)); to try it, build the VSIX as below and install it with **Extensions: Install from VSIX...**.
+The language is still being designed, and the extension follows the recorded decisions. Its pre-releases are published to the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=cesiumlang.vscode-cesium) and [Open VSX](https://open-vsx.org/extension/cesiumlang/vscode-cesium) as `cesiumlang.vscode-cesium` ([#4](https://github.com/cesiumlang/vscode-cesium/issues/4); see [Publishing](#publishing)); to try a build of `dev`, build the VSIX as below and install it with **Extensions: Install from VSIX...**.
 
 ## Development setup
 

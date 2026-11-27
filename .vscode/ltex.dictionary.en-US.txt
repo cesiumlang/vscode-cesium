@@ -13,3 +13,16 @@ VSIX
 zcsls
 zfls
 Authenticode
+gdb
+lldb
+lldb-dap
+readme
+cppdbg
+cpptools
+xcrun
+cppvsdbg
+WinDbg
+CodeView
+cdb
+libcsir
+fdebug

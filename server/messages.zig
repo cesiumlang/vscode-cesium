@@ -2,7 +2,9 @@
 //! `line:col: error: message` from `cesium1`, with lines counted from the
 //! start of its input; `file:line:col: error: message` from `cesium0`; and
 //! messages without a place, such as `cesium0: error: ...` (its verifier)
-//! and `error: internal: ...` (a limit of `cesium1`).
+//! and `error: internal: ...` (a limit of `cesium1`). A diagnostic code
+//! may follow the severity word: `error[E0101]: message`
+//! (cesium-src/bootstrap/diagnostics.md).
 
 const std = @import("std");
 
@@ -16,6 +18,8 @@ pub const Message = struct {
     /// 1-based, in bytes; 0 when the message has no place
     col: usize = 0,
     severity: Severity,
+    /// The diagnostic code in brackets after the severity word, if any
+    code: ?[]const u8 = null,
     text: []const u8,
 };
 
@@ -23,20 +27,46 @@ pub const Message = struct {
 /// before the line end is ignored); slices of `line`
 pub fn parseLine(line: []const u8) ?Message {
     const l = std.mem.trimEnd(u8, line, "\r\n");
-    // the first severity word on the line; the text may hold another
-    var best: ?Message = null;
-    var best_at: usize = l.len;
-    inline for (.{ Severity.@"error", Severity.warning }) |sev| {
-        const word = @tagName(sev) ++ ": ";
-        if (std.mem.startsWith(u8, l, word)) return .{ .severity = sev, .text = l[word.len..] };
-        if (std.mem.find(u8, l, ": " ++ word)) |at| if (at < best_at) {
-            best_at = at;
-            best = .{ .severity = sev, .text = l[at + 2 + word.len ..] };
-        };
+    // the first severity word, at the start or after ": "; the text may
+    // hold another
+    var at: usize = 0;
+    while (true) {
+        if (severityAt(l, at)) |h| {
+            var m: Message = .{ .severity = h.severity, .code = h.code, .text = l[h.text..] };
+            if (at > 0) place(l[0 .. at - 2], &m);
+            return m;
+        }
+        at = (std.mem.findPos(u8, l, at, ": ") orelse return null) + 2;
     }
-    var m = best orelse return null;
-    place(l[0..best_at], &m);
-    return m;
+}
+
+const SeverityAt = struct { severity: Severity, code: ?[]const u8, text: usize };
+
+/// The severity word at `at`, with its code (`error[E0101]: `), and where
+/// the text after it starts
+fn severityAt(l: []const u8, at: usize) ?SeverityAt {
+    inline for (.{ Severity.@"error", Severity.warning }) |sev| {
+        const word = @tagName(sev);
+        if (std.mem.startsWith(u8, l[at..], word)) {
+            var end = at + word.len;
+            var code: ?[]const u8 = null;
+            if (end < l.len and l[end] == '[') {
+                const close = std.mem.findScalarPos(u8, l, end, ']') orelse return null;
+                code = l[end + 1 .. close];
+                if (!isCode(code.?)) return null;
+                end = close + 1;
+            }
+            if (std.mem.startsWith(u8, l[end..], ": ")) return .{ .severity = sev, .code = code, .text = end + 2 };
+        }
+    }
+    return null;
+}
+
+/// A code is a few letters and digits
+fn isCode(s: []const u8) bool {
+    if (s.len == 0 or s.len > 16) return false;
+    for (s) |c| if (!std.ascii.isAlphanumeric(c)) return false;
+    return true;
 }
 
 /// Fills in the file, line and column of `prefix` (`[file:]line:col`);
@@ -94,6 +124,21 @@ test "messages without a place" {
     const internal = parseLine("error: internal: too many tokens").?;
     try testing.expectEqual(0, internal.line);
     try testing.expectEqualStrings("internal: too many tokens", internal.text);
+}
+
+test "a diagnostic code after the severity word" {
+    const m1 = parseLine("5:10: error[E0301]: unknown name 'x'").?;
+    try testing.expectEqual(5, m1.line);
+    try testing.expectEqualStrings("E0301", m1.code.?);
+    try testing.expectEqualStrings("unknown name 'x'", m1.text);
+    const m0 = parseLine("C:\\src\\b.csm:2:10: error[E0201]: expected ';', found end of file").?;
+    try testing.expectEqualStrings("C:\\src\\b.csm", m0.file.?);
+    try testing.expectEqual(2, m0.line);
+    try testing.expectEqualStrings("E0201", m0.code.?);
+    try testing.expectEqualStrings("expected ';', found end of file", m0.text);
+    try testing.expectEqual(null, parseLine("5:10: error: unknown name 'x'").?.code);
+    // brackets that are no code leave the line without a message
+    try testing.expectEqual(null, parseLine("5:10: error[a b]: x"));
 }
 
 test "a message whose text holds a colon and the word error" {

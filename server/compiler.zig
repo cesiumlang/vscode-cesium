@@ -90,8 +90,8 @@ pub fn run(a: Allocator, io: Io, c: Compiler, files: []const []const u8, input: 
     defer argv.deinit(a);
     try argv.append(a, c.path);
     if (c.kind == .cesium0) {
-        // the MIR is not wanted: checking stops before QBE
-        try argv.appendSlice(a, &.{ "--emit-mir", "-o", if (is_windows) "NUL" else "/dev/null" });
+        // the SIR is not wanted: checking stops before QBE
+        try argv.appendSlice(a, &.{ "--emit-sir", "-o", if (is_windows) "NUL" else "/dev/null" });
         try argv.appendSlice(a, files);
     }
     var child = std.process.spawn(io, .{

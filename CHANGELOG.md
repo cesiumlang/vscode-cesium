@@ -1,6 +1,16 @@
 # Changelog
 
-## 0.1.2 (unreleased)
+## 0.1.3 (unreleased)
+
+- Breakpoints can be set in `.csm` files, for a native debugger: the bootstrap compilers' output now has line information (cesiumlang/cesium#78), and the readme's "Debugging" gives launch configurations for lldb-dap and gdb, and for the Visual Studio debugger on Windows, where the compilers now write CodeView line tables (#47). In a debug build, the compilers' default, the debugger also shows locals and parameters with their types, in their lexical scopes (cesiumlang/cesium#143).
+
+- `zcsls` reads the compilers' diagnostic codes (`error[E0304]: ...`, cesiumlang/cesium#82) and gives each as its diagnostic's code, shown in the Problems panel with a link to its explanation on cesiumlang.org; without this, compilers that print codes had their errors dropped.
+
+- `zcsls` checks with `cesium0 --emit-sir`: the compilers' middle IR (MIR) is now the semantic IR (SIR), and `--emit-mir` is gone (cesiumlang/cesium#152).
+
+- Doc comments highlight Javadoc tags (`@param`) only; Doxygen backslash tags (`\param`) are not Cesium's (cesiumlang/grammar#4).
+
+## 0.1.2
 
 - For the AI assistants in VS Code: the Cesium skill (`contributes.chatSkills`), the rules of the language with where each comes from and what is still open, generated from the specification on [cesiumlang.org](https://cesiumlang.org); and instructions for Cesium files (`contributes.chatInstructions`), to read the skill and check every change with the language server or a compiler. The agent plugin ships the same skill.
 - The `zcsls.exe` in the Windows packages is signed (Authenticode, through Azure Artifact Signing).
