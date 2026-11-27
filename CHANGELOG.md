@@ -2,6 +2,8 @@
 
 ## 0.1.4 (unreleased)
 
+- The operators of the specification are highlighted as operators: the address comparisons `#==` and `#!=`, bitwise NOT `!.`, the elementwise product `.*`, and the conditional `? :` (cesiumlang/grammar#21).
+
 ## 0.1.3
 
 - Breakpoints can be set in `.csm` files, for a native debugger: the bootstrap compilers' output now has line information (cesiumlang/cesium#78), and the readme's "Debugging" gives launch configurations for lldb-dap and gdb, and for the Visual Studio debugger on Windows, where the compilers now write CodeView line tables (#47). In a debug build, the compilers' default, the debugger also shows locals and parameters with their types, in their lexical scopes (cesiumlang/cesium#143).
@@ -11,8 +13,6 @@
 - `zcsls` checks with `cesium0 --emit-sir`: the compilers' middle IR (MIR) is now the semantic IR (SIR), and `--emit-mir` is gone (cesiumlang/cesium#152).
 
 - Doc comments highlight Javadoc tags (`@param`) only; Doxygen backslash tags (`\param`) are not Cesium's (cesiumlang/grammar#4).
-
-- The operators of the specification are highlighted as operators: the address comparisons `#==` and `#!=`, bitwise NOT `!.`, the elementwise product `.*`, and the conditional `? :` (cesiumlang/grammar#21).
 
 ## 0.1.2
 
