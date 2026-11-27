@@ -6,6 +6,8 @@
 
 - `zcsls` reads the compilers' diagnostic codes (`error[E0304]: ...`, cesiumlang/cesium#82) and gives each as its diagnostic's code, shown in the Problems panel with a link to its explanation on cesiumlang.org; without this, compilers that print codes had their errors dropped.
 
+- `zcsls` checks with `cesium0 --emit-sir`: the compilers' middle IR (MIR) is now the semantic IR (SIR), and `--emit-mir` is gone (cesiumlang/cesium#152).
+
 ## 0.1.2
 
 - For the AI assistants in VS Code: the Cesium skill (`contributes.chatSkills`), the rules of the language with where each comes from and what is still open, generated from the specification on [cesiumlang.org](https://cesiumlang.org); and instructions for Cesium files (`contributes.chatInstructions`), to read the skill and check every change with the language server or a compiler. The agent plugin ships the same skill.
